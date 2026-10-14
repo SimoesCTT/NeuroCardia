@@ -1,0 +1,251 @@
+/* NeuroCardia site — dark theme matching the app */
+
+:root {
+  --navy-deep:     #0B1B2E;
+  --navy-surface:  #142A44;
+  --navy-elevated: #1C3A5C;
+  --cyan-glow:     #4DD9E8;
+  --signal-white:  #F0F6FA;
+  --signal-muted:  #8FA3B8;
+  --flag-warning:  #E8A33D;
+}
+
+* { box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui,
+               sans-serif;
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--signal-white);
+  background: var(--navy-deep);
+}
+
+.container {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 0 24px;
+}
+
+header {
+  padding: 72px 0 56px;
+  text-align: center;
+  background: linear-gradient(180deg, var(--navy-elevated) 0%, var(--navy-deep) 100%);
+}
+
+.logo {
+  border-radius: 20px;
+  margin-bottom: 24px;
+}
+
+h1 {
+  font-size: 48px;
+  margin: 0 0 8px;
+  letter-spacing: -1px;
+  font-weight: 600;
+}
+
+.tagline {
+  font-size: 20px;
+  color: var(--signal-white);
+  margin: 0 0 4px;
+}
+
+.subtagline {
+  font-size: 15px;
+  color: var(--signal-muted);
+  margin: 0 0 32px;
+}
+
+.buttons {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.btn {
+  display: inline-block;
+  padding: 14px 28px;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 500;
+  text-decoration: none;
+  transition: all 0.15s ease;
+}
+
+.btn.primary {
+  background: var(--cyan-glow);
+  color: var(--navy-deep);
+}
+
+.btn.primary:hover {
+  background: #6FE5F2;
+  transform: translateY(-1px);
+}
+
+.btn.secondary {
+  background: transparent;
+  color: var(--cyan-glow);
+  border: 1px solid var(--cyan-glow);
+}
+
+.btn.secondary:hover {
+  background: rgba(77, 217, 232, 0.1);
+}
+
+main {
+  padding: 32px 0 64px;
+}
+
+section {
+  margin-bottom: 56px;
+  padding-bottom: 40px;
+  border-bottom: 1px solid var(--navy-elevated);
+}
+
+section:last-of-type {
+  border-bottom: none;
+}
+
+h2 {
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--cyan-glow);
+  margin: 0 0 20px;
+  letter-spacing: 0.3px;
+}
+
+p {
+  color: var(--signal-white);
+  margin: 0 0 16px;
+}
+
+a {
+  color: var(--cyan-glow);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+ul {
+  padding-left: 24px;
+}
+
+ul.features li,
+ul.nofeatures li,
+ul.papers li {
+  margin-bottom: 10px;
+}
+
+ul.nofeatures li {
+  color: var(--signal-muted);
+}
+
+ol {
+  padding-left: 24px;
+}
+
+ol li {
+  margin-bottom: 8px;
+}
+
+.meta {
+  color: var(--signal-muted);
+  font-size: 14px;
+}
+
+.shots {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+
+.shots figure {
+  margin: 0;
+}
+
+.shots img {
+  width: 100%;
+  height: auto;
+  border-radius: 12px;
+  background: var(--navy-surface);
+  display: block;
+}
+
+.shots figcaption {
+  font-size: 13px;
+  color: var(--signal-muted);
+  margin-top: 8px;
+  line-height: 1.4;
+}
+
+video {
+  width: 100%;
+  max-width: 800px;
+  border-radius: 12px;
+  background: var(--navy-surface);
+  display: block;
+  margin: 0 auto;
+}
+
+pre {
+  background: var(--navy-surface);
+  border-radius: 8px;
+  padding: 16px 20px;
+  overflow-x: auto;
+  border: 1px solid var(--navy-elevated);
+}
+
+code {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  font-size: 14px;
+  color: var(--signal-white);
+}
+
+pre code {
+  color: var(--cyan-glow);
+}
+
+footer {
+  padding: 40px 0;
+  border-top: 1px solid var(--navy-elevated);
+  text-align: center;
+  color: var(--signal-muted);
+  font-size: 14px;
+}
+
+footer p {
+  color: var(--signal-muted);
+  margin: 8px 0;
+}
+
+footer a {
+  color: var(--signal-muted);
+}
+
+footer a:hover {
+  color: var(--cyan-glow);
+}
+
+@media (max-width: 640px) {
+  h1 { font-size: 36px; }
+  .tagline { font-size: 17px; }
+  .shots { grid-template-columns: 1fr; }
+  header { padding: 48px 0 40px; }
+}
+
+.feature-image {
+  width: 100%;
+  max-width: 640px;
+  height: auto;
+  display: block;
+  margin: 0 auto 20px;
+  border-radius: 8px;
+  background: var(--navy-deep);
+}

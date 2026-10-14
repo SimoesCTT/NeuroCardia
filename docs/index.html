@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NeuroCardia — an on-device ECG analyzer</title>
+  <meta name="description" content="Free, open-source Android app for offline analysis of single-lead ECG recordings. Reads CSV and WFDB. Computes HRV and a phase-domain cardiac synchronization index. No cloud, no accounts, no telemetry.">
+  <link rel="icon" type="image/png" href="img/icon.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <div class="container">
+      <img class="logo" src="img/icon.png" alt="NeuroCardia icon" width="96" height="96">
+      <h1>NeuroCardia</h1>
+      <p class="tagline">An on-device ECG analyzer for Android.</p>
+      <p class="subtagline">Free, open-source, no cloud, no accounts, no telemetry.</p>
+      <div class="buttons">
+        <a class="btn primary" href="https://github.com/SimoesCTT/NeuroCardia/releases/latest">Download APK</a>
+        <a class="btn secondary" href="https://github.com/SimoesCTT/NeuroCardia">Source code</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+
+    <section id="about">
+      <h2>What it is</h2>
+      <p>
+        NeuroCardia reads single-lead ECG recordings, detects R-peaks, computes
+        heart rate variability, and produces PDF and CSV reports. Everything
+        runs on the phone. It works in airplane mode.
+      </p>
+      <p>
+        It is a tool for people who already work with ECG data — clinicians,
+        researchers, biomedical engineers. If you have never opened an ECG
+        file, this application will not be useful to you.
+      </p>
+    </section>
+
+    <section id="screenshot">
+      <h2>Screenshots</h2>
+      <div class="shots">
+        <figure>
+          <img src="img/screenshot.png" alt="Analyzer view" loading="lazy">
+          <figcaption>Analyzer — real MIT-BIH record, R-peaks detected, metrics computed on-device.</figcaption>
+        </figure>
+        <figure>
+          <img src="img/batch.png" alt="Batch view" loading="lazy">
+          <figcaption>Batch — process a folder of recordings, get cohort statistics.</figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <section id="demo">
+      <h2>Demo</h2>
+      <video controls preload="metadata" poster="video/poster.png">
+        <source src="video/demo.mp4" type="video/mp4">
+        Your browser does not support the video tag.
+        <a href="video/demo.mp4">Download the video</a>.
+      </video>
+    </section>
+
+    <section id="features">
+      <h2>What it does</h2>
+      <ul class="features">
+        <li><strong>Reads</strong> single-lead ECG recordings from CSV and WFDB files (the PhysioNet reference format).</li>
+        <li><strong>Detects</strong> R-peaks with a pure-Kotlin Pan–Tompkins implementation, validated against the MIT-BIH Arrhythmia Database at 2272 of 2272 reference annotations on record 100.</li>
+        <li><strong>Computes</strong> conventional HRV: RMSSD, SDNN, pNN50, pNN20, SD1, SD2, SD1/SD2.</li>
+        <li><strong>Scores</strong> signal quality on four independent axes (SNR, flatline, clipping, baseline wander), with a composite verdict.</li>
+        <li><strong>Runs a research feature</strong>: the Cardiac Synchronization Index, a phase-domain metric derived from a Kuramoto coupled-oscillator network.</li>
+        <li><strong>Processes</strong> folders in batch mode with per-record and cohort statistics.</li>
+        <li><strong>Exports</strong> PDF reports and CSV data.</li>
+      </ul>
+    </section>
+
+    <section id="oscillator">
+      <h2>The phase circle</h2>
+      <img class="feature-image" src="img/feature-oscillator.svg"
+           alt="Sixteen coupled oscillators on the phase circle with the order parameter vector r(t)">
+      <p>
+        Each oscillator is a point on the unit circle. The order parameter
+        <code>r(t)</code> measures how tightly the sixteen phases cluster.
+        When the phases are uniformly distributed, <code>r</code> is near
+        1/&radic;16 &asymp; 0.25. When they lock, <code>r</code> approaches 1.
+        The CSI reported by the app is the mean of <code>r(t)</code> over
+        the recording.
+      </p>
+    </section>
+
+    <section id="roc">
+      <h2>The residual finding</h2>
+      <img class="feature-image" src="img/feature-roc.svg"
+           alt="ROC curve of the Kuramoto residual separating sinus from atrial fibrillation, AUC 0.89">
+      <p>
+        On a pilot corpus of nine sinus and nine atrial fibrillation
+        recordings, the Kuramoto residual separates the two cohorts with
+        area under the ROC curve of 0.89. The finding is preliminary and
+        documented in the residual paper. Full-corpus replication is the
+        next step.
+      </p>
+    </section>
+
+    <section id="not">
+      <h2>What it does not do</h2>
+      <ul class="nofeatures">
+        <li>No network. No cloud. No accounts. No telemetry.</li>
+        <li>No Bluetooth ECG devices. The file-export workflow is supported instead.</li>
+        <li>No clinical diagnosis. Research and educational use only.</li>
+        <li>No FHIR or hospital system integration.</li>
+      </ul>
+    </section>
+
+    <section id="install">
+      <h2>Install</h2>
+      <ol>
+        <li>Download <a href="https://github.com/SimoesCTT/NeuroCardia/releases/latest">the latest release APK</a>.</li>
+        <li>On your Android device, enable <em>Install unknown apps</em> for your file manager (Settings → Apps → Special access → Install unknown apps).</li>
+        <li>Open the downloaded APK and confirm installation.</li>
+      </ol>
+      <p class="meta">Requires Android 8.0 or later (API 26).</p>
+    </section>
+
+    <section id="papers">
+      <h2>Technical documents</h2>
+      <p>Four papers accompany the release. Sources are LaTeX; compiled PDFs are included.</p>
+      <ul class="papers">
+        <li>
+          <a href="papers/whitepaper.pdf">White paper</a>
+          — technical and regulatory overview.
+        </li>
+        <li>
+          <a href="papers/kuramoto-engine.pdf">The Kuramoto Engine</a>
+          — self-contained mathematical reference.
+        </li>
+        <li>
+          <a href="papers/residual-paper.pdf">The Kuramoto Residual</a>
+          — research paper on the phase-domain residual finding.
+        </li>
+        <li>
+          <a href="papers/sensitivity-analysis.pdf">Sensitivity Analysis Protocol</a>
+          — validation methodology and results.
+        </li>
+      </ul>
+    </section>
+
+    <section id="build">
+      <h2>Build from source</h2>
+<pre><code>git clone https://github.com/SimoesCTT/NeuroCardia
+cd NeuroCardia
+./gradlew :app:assembleDebug
+adb install app/build/outputs/apk/debug/app-debug.apk</code></pre>
+      <p>
+        Requires JDK 17 or newer and the Android SDK with platform 34.
+        Gradle auto-provisions JDK 17 through the Foojay toolchain
+        resolver if it is not already installed.
+      </p>
+    </section>
+
+    <section id="license">
+      <h2>License</h2>
+      <p>
+        Software: <a href="https://www.gnu.org/licenses/gpl-3.0.html">GPL-3.0-or-later</a>.
+        Documentation: <a href="https://creativecommons.org/licenses/by/4.0/">CC-BY-4.0</a>.
+      </p>
+    </section>
+
+  </main>
+
+  <footer>
+    <div class="container">
+      <p>
+        <a href="https://github.com/SimoesCTT/NeuroCardia">GitHub</a> ·
+        <a href="https://github.com/SimoesCTT/NeuroCardia/issues">Issues</a> ·
+        <a href="https://github.com/SimoesCTT/NeuroCardia/releases">Releases</a>
+      </p>
+      <p class="meta">NeuroCardia is not a medical device. Research and educational use only.</p>
+    </div>
+  </footer>
+</body>
+</html>
