@@ -1,0 +1,11 @@
+key,value
+arm,A
+k,2.0
+n,18
+regression_intercept,0.673017
+regression_slope,-0.018389
+
+feature,rho_overall,rho_label0,rho_label1
+pwave_energy,-0.320949,-0.116667,-0.100000
+pwave_pr_var,-0.174407,0.116667,-0.866667
+pwave_fib_amp,-0.157895,0.600000,-0.616667

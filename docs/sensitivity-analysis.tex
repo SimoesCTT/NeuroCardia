@@ -1,0 +1,587 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage[hidelinks]{hyperref}
+\usepackage{times}
+
+\title{\textbf{Sensitivity Analysis Protocol}\\[4pt]
+\large Validation Methodology for the Kuramoto Phase Engine in
+NEUROCARDIA\\[2pt]
+\normalsize Companion document to the NEUROCARDIA White Paper\\[2pt]
+\small Version 0.2 --- Protocol and Results}
+\author{Americo Simoes \\ \texttt{amexsimoes@gmail.com}}
+\date{October 14, 2026}
+
+\begin{document}
+\maketitle
+
+\begin{center}
+\small
+Copyright \textcopyright{} 2026 Americo Simoes. All rights reserved.\\
+This document is released under the Creative Commons Attribution 4.0
+International License (CC-BY-4.0). The software it describes is
+released under the GNU General Public License, version 3 or later
+(GPL-3.0-or-later).
+\end{center}
+
+\vspace{1em}
+\noindent\fbox{\parbox{\dimexpr\linewidth-2\fboxsep-2\fboxrule}{%
+\textbf{Revision history.} This is revision 0.2 of the
+\emph{Sensitivity Analysis Protocol}. Revision 0.1 (October 14, 2026)
+specified the protocol, the five experimental arms, and the acceptance
+criteria, but reserved the results section for a subsequent revision.
+Revision 0.2 populates the results section, adds the residual AUC as a
+fourth evaluation metric, introduces a companion acceptance criterion
+for the residual diagnostic, and reports the finding that trajectory
+robustness and residual robustness are disjoint. The protocol
+specification of revision 0.1 is unchanged.}}
+
+\vspace{1em}
+
+\begin{abstract}
+The NeuroCardia diagnostic engine applies a Kuramoto network of $N = 16$
+coupled oscillators to the RR tachogram of a single-lead ECG recording,
+producing a Cardiac Synchronization Index (CSI, $r(t)$) and a family of
+early warning signals (EWS). Three parameter choices distinguish this
+engine from the standard Kuramoto literature: a deterministic frequency
+distribution drawn from the non-trivial Riemann zeros, a carrier
+frequency five orders of magnitude above the cardiac band, and
+logarithmic rather than linear spacing between adjacent frequencies.
+This document specifies the formal sensitivity analysis protocol that
+determines whether the resulting CSI and EWS are robust against these
+choices, and reports the results of running the protocol against the
+MIT-BIH Arrhythmia Database and a paired corpus of normal sinus and
+atrial fibrillation recordings.
+
+The principal findings are two. First, the absolute value of the CSI is
+not robust to the frequency distribution at any coupling strength where
+the metric has dynamic range. The mean Pearson correlation between the
+CSI trajectory under the Riemann-zero configuration and under any
+alternative configuration is at most $0.17$ at $K = 2$, and reaches the
+pre-registered threshold of $0.80$ only for the linear-spacing
+distribution at $K = 30$, where the network is saturated. Second, the
+residual diagnostic that the companion papers report is not robust to
+the frequency distribution either: three of five distributions exhibit
+the residual at $K = 2$ (AUC 0.84--0.89), and two do not (AUC
+0.54--0.56). The two robustness properties are disjoint: no monotone
+relation exists between trajectory correlation and residual AUC across
+the five arms.
+
+The protocol's purpose is both scientific defensibility and
+satisfaction of the analytical validation requirements of the
+IEC 62304 / FDA 510(k) pathway.
+\end{abstract}
+
+\tableofcontents
+
+\section{Introduction}
+
+\subsection{Context}
+
+The NeuroCardia diagnostic engine applies a Kuramoto model of coupled
+phase oscillators to the RR interval series of a single-lead ECG
+recording. The model treats the sinoatrial node as a population of
+coupled pacemaker cells and produces a time-varying order parameter
+$r(t)$, called the Cardiac Synchronization Index (CSI). A family of
+derived metrics --- variance, lag-1 autocorrelation, skewness,
+kurtosis --- is computed over sliding windows and reported as early
+warning signals (EWS) of impending rhythm transitions.
+
+The engine is a specific parameterization of the standard Kuramoto
+model. Three of its parameter choices are inherited from the
+Convergent reference framework and are not found in the standard
+literature. This document specifies the protocol by which those
+choices are tested for robustness, and reports the results.
+
+\subsection{Why sensitivity analysis}
+
+A diagnostic metric is only as trustworthy as its robustness to
+arbitrary choices. If the CSI is driven by the physical dynamics of the
+cardiac rhythm, it should be stable across reasonable variations of the
+model's free parameters. If it is driven by the specific values of
+those parameters, then any diagnostic claim derived from it is
+conditioned on those values, and the model's scientific value is
+correspondingly reduced.
+
+For a research tool, this is an interesting question. For a medical
+device, it is a regulatory requirement. The FDA's guidance on
+analytical validation for SaMD requires that the manufacturer
+demonstrate that the algorithm computes what it claims to compute, and
+that its outputs are not artifacts of parameter selection.
+
+\subsection{Scope}
+
+This document specifies: the three parameter choices under test
+(Section~2), the experimental design comprising five arms
+(Section~3), the evaluation metrics applied to each arm (Section~4),
+the acceptance and falsification criteria (Section~5), the reporting
+protocol (Section~6), and the results of running the protocol
+(Section~7).
+
+\section{Parameters Under Test}
+
+\subsection{Deterministic frequency distribution}
+
+Standard Kuramoto implementations assign each oscillator a natural
+frequency drawn from a probability distribution $g(\omega)$ ---
+commonly Gaussian, uniform, or Lorentzian. NeuroCardia instead assigns
+frequencies deterministically from the non-trivial zeros of the Riemann
+zeta function. The first 16 such zeros are used for the production
+network of $N = 16$ oscillators, and the first 24 are tabulated for
+extended networks.
+
+The author does not claim that the Riemann zeros have a cardiac
+physiological correlate. The choice reflects a mathematical rather
+than a physiological motivation. Whether this matters for the
+diagnostic output is the question this protocol addresses.
+
+\subsection{Carrier frequency scale}
+
+The reference parameterization places the carrier frequency at
+$\Omega_T = 587{,}000$ rad/s, five orders of magnitude above the cardiac
+rhythm (approximately $1$ Hz). The dimensionless order parameter $r(t)$
+is, by construction, invariant to the absolute scale of $\Omega_T$,
+because the RR-to-phase mapping and the R-peak phase resets couple the
+network to relative beat timing only. The normalized frequencies used in
+production are obtained by subtracting the carrier and scaling to unit
+variance; this linear transformation does not change the shape of the
+distribution.
+
+\subsection{Logarithmic frequency spacing}
+
+The Riemann zeros grow denser as $\gamma$ increases. Their spacing is
+governed by the Riemann-von Mangoldt formula, giving an approximately
+logarithmic density. This contrasts with the linear spacing of a
+uniformly distributed frequency set, and with the unimodal clustering
+of a Gaussian set. Whether the CSI depends on the shape of the
+frequency distribution, or only on its overall variance, is an
+empirical question.
+
+\section{Experimental Design}
+
+\subsection{Benchmark corpus}
+
+The analysis runs on a curated subset of the PhysioNet reference
+databases chosen to span the clinically relevant range of cardiac
+dynamics. For the trajectory sensitivity analysis, 48 records from the
+MIT-BIH Arrhythmia Database~\cite{mitdb} were used. For the residual
+sensitivity analysis, a paired corpus of nine records from the MIT-BIH
+Normal Sinus Rhythm Database~\cite{nsrdb} and nine records from the
+MIT-BIH Atrial Fibrillation Database~\cite{afdb} was used, each trimmed
+to the first ten minutes.
+
+All records are annotated. R-peak detection is performed by the
+Pan-Tompkins module in NeuroCardia~\cite{pan1985}, then verified against
+the reference annotations before any CSI computation. Records with
+$Se < 99\%$ or $PPV < 99\%$ are excluded from the analysis and reported
+separately.
+
+\subsection{Experimental arms}
+
+Five arms share an identical preprocessing pipeline (Pan-Tompkins
+R-peak detection, RR-to-phase mapping) and differ only in the Kuramoto
+engine frequency distribution.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lll}
+\toprule
+Arm & Distribution & Notes \\
+\midrule
+A & Riemann zeros & Reference configuration \\
+B & Uniform random & Stochastic; seed 42 \\
+C & Gaussian & Deterministic (fixed seed) \\
+D & Physiological scale & Bounded, uniform on a physiological range \\
+E & Linear spacing & Uniform on an integer grid \\
+\bottomrule
+\end{tabular}
+\caption{The five experimental arms. All arms use $N = 16$,
+all-to-all coupling, and the same RR-to-phase mapping.}
+\label{tab:arms}
+\end{table}
+
+\subsection{Controlled variables}
+
+The number of oscillators ($N = 16$), the coupling topology
+(all-to-all), the integration scheme (Euler with $\Delta t = 0.05$ s),
+the phase-reset rule (reset oscillator 0 at each R-peak to the
+cumulative phase), and the R-peak detector (Pan-Tompkins) are held
+fixed across arms.
+
+\section{Evaluation Metrics}
+
+\subsection{Trajectory correlation}
+
+The primary metric is the Pearson correlation between the CSI
+trajectory $r_A(t)$ under Arm A and the trajectory $r_X(t)$ under each
+alternative arm $X$. Because the trajectories may have different
+lengths if the reset schedule differs, we sample both at the same beat
+indices and compute the correlation over the shorter of the two.
+
+The secondary trajectory metric is the normalized dynamic time warping
+(DTW) distance between the two trajectories. Lower values indicate
+greater similarity.
+
+\subsection{Residual AUC}
+
+The trajectory correlation measures whether the CSI is well-defined
+under parameter perturbation. It does not measure whether the CSI is
+diagnostic. The companion papers~\cite{simoes2026residual} identify a
+specific diagnostic --- the residual of the CSI after regressing out
+the coefficient of variation of the RR series --- and report that it
+separates sinus from AF at $K = 2$ with AUC $0.89$ under Arm A.
+
+We therefore add a second criterion: the residual AUC must be $\geq
+0.80$ for the arm to be considered diagnostically usable. This
+criterion is independent of the trajectory criterion, and
+Section~7.4 shows that the two are disjoint.
+
+\subsection{Bifurcation and transition timing}
+
+Where the downstream diagnostic output is a discrete classification
+over a sliding window, the concordance between Arm A and each
+alternative arm is measured by Cohen's Kappa. This metric was specified
+in revision 0.1 as a secondary criterion. It is reported where
+applicable; the pilot corpus does not have the annotated transitions
+required for a full analysis.
+
+\section{Acceptance and Falsification Criteria}
+
+\subsection{Trajectory acceptance}
+
+The engine is deemed robust to a parameter if, across all records in the
+benchmark corpus, the trajectory correlation with Arm A is at least
+$r = 0.80$, and the normalized DTW distance is at most the within-Arm-A
+variability measured on repeated runs of the same record.
+
+\subsection{Residual acceptance}
+
+The engine is deemed diagnostically robust to a parameter if, on the
+paired sinus/AF corpus, the residual AUC for the corresponding arm is
+at least $0.80$ at the optimum $K$.
+
+\subsection{Partial robustness}
+
+If the trajectory correlation falls between $r = 0.60$ and $r = 0.80$,
+or the residual AUC falls between $0.65$ and $0.80$, the parameter is
+deemed partially robust. In this case the white paper is updated to
+qualify the corresponding claim, and the parameter is flagged as a
+modeling assumption rather than a physical invariant.
+
+\subsection{Falsification}
+
+If the trajectory correlation falls below $r = 0.60$, or the residual
+AUC falls below $0.65$, the parameter is deemed not robust for the
+corresponding criterion. In this case: the white paper's corresponding
+claim is restricted; the parameterization is designated a
+model-dependent projection; and the diagnostic value of the metric is
+reported as conditioned on the specific parameterization.
+
+\subsection{Interpretation}
+
+The protocol is designed to be falsifiable. A result that confirms
+robustness is a positive scientific finding. A result that refutes
+robustness is not a failure of the project --- it is an honest
+characterization of what the metric measures and what it does not. The
+white paper's regulatory claims are conditional on this outcome.
+
+\section{Reporting Protocol}
+
+\subsection{Pre-registration}
+
+The protocol specified in this document is fixed before any sensitivity
+analysis is run. Subsequent modifications are logged in a revision
+history, dated, and accompanied by a stated rationale. The purpose is
+to prevent post-hoc adjustment of the acceptance criteria in response
+to observed results.
+
+\subsection{Outputs}
+
+For each record, the analysis produces: a CSV file with one row per arm
+per seed per metric; a per-record CSV for the residual with one row per
+arm per record; and a summary table aggregating across the corpus. All
+outputs are committed to the repository under
+\texttt{validation/reports/} and are reproducible with a single Gradle
+command.
+
+\subsection{Publication}
+
+The results of the sensitivity analysis are reported in Section~7 of
+this document. Where the results are of general scientific interest
+they are additionally reported in the companion
+documents~\cite{simoes2026residual,simoes2026engine}.
+
+\section{Results}
+
+\subsection{Trajectory robustness}
+
+Table~\ref{tab:trajectory} reports the mean $\pm$ SD of the Pearson
+correlation between the CSI trajectory under Arm A and under each
+alternative arm, at five values of the coupling strength $K$, across
+48 mitdb records.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{r|cccc}
+\toprule
+$K$ & Arm B & Arm C & Arm D & Arm E \\
+\midrule
+2.0 & $0.052 \pm 0.030$ & $0.076 \pm 0.042$ & $0.051 \pm 0.035$ & $0.168 \pm 0.089$ \\
+5.0 & $0.250 \pm 0.045$ & $0.230 \pm 0.031$ & $0.250 \pm 0.045$ & $0.611 \pm 0.177$ \\
+10.0 & $0.386 \pm 0.102$ & $0.366 \pm 0.085$ & $0.386 \pm 0.102$ & $0.778 \pm 0.171$ \\
+30.0 & $0.458 \pm 0.165$ & $0.428 \pm 0.152$ & $0.458 \pm 0.165$ & $\mathbf{0.869 \pm 0.131}$ \\
+100.0 & $-0.000 \pm 0.005$ & $0.000 \pm 0.006$ & $0.001 \pm 0.005$ & $0.001 \pm 0.005$ \\
+\bottomrule
+\end{tabular}
+\caption{Mean $\pm$ SD Pearson correlation between the CSI trajectory
+under Arm A and under each alternative arm, across 48 mitdb records.
+The pre-registered threshold is $r = 0.80$. Only Arm E at $K = 30$
+meets it, and that is the coupling strength at which the network is
+saturated.}
+\label{tab:trajectory}
+\end{table}
+
+Three observations.
+
+First, at $K = 2$ --- the coupling strength at which the residual
+diagnostic is strongest --- all four alternative arms fail the
+trajectory criterion, with mean correlations of $0.05$--$0.17$ and
+standard deviations small relative to the means. Every individual
+record fails the threshold, not just the mean.
+
+Second, the trajectory correlation rises monotonically with $K$ up to
+$K = 30$, at which point Arm E meets the $0.80$ threshold. But $K =
+30$ is the coupling strength at which the CSI saturates: the mean
+order parameter across the corpus is $\approx 0.998$ with variance
+$\approx 10^{-5}$, and the metric is a monotone function of RR
+variability. Meeting the trajectory criterion at a saturated coupling
+strength is not a robustness success.
+
+Third, at $K = 100$ the trajectory correlation collapses to zero and
+the DTW distance is the largest in the table. This is the regime in
+which the Euler integration aliases the sine term: the phase advances
+by more than $\pi$ per step and the sine evaluation is effectively
+random.
+
+The conclusion is that the CSI's absolute trajectory is not robust to
+the frequency distribution at any coupling strength where the metric
+has dynamic range.
+
+\subsection{Residual robustness}
+
+Table~\ref{tab:residual-arms} reports the residual AUC at $K = 2$ for
+each of the five arms, on the paired sinus/AF corpus of nine and nine
+records.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{llrrr}
+\toprule
+Arm & Distribution & Trajectory $\rho$ vs A & Residual AUC & Residual $p$ \\
+\midrule
+A & Riemann zeros & $1.000$ (ref) & $\mathbf{0.889}$ & $0.002$ \\
+B & Uniform random & $0.052$ & $0.543$ & $0.986$ \\
+C & Gaussian & $0.076$ & $\mathbf{0.852}$ & $0.007$ \\
+D & Physiological scale & $0.051$ & $0.556$ & $0.982$ \\
+E & Linear spacing & $0.168$ & $\mathbf{0.840}$ & $0.010$ \\
+\bottomrule
+\end{tabular}
+\caption{Trajectory correlation and residual AUC at $K = 2$ for each
+arm. Arms A, C, and E exhibit a diagnostic residual; arms B and D do
+not. The trajectory correlation and residual AUC are not monotonically
+related across arms.}
+\label{tab:residual-arms}
+\end{table}
+
+Three of five arms exhibit the residual; two do not. The two
+distributions that fail (uniform random and physiological scale) are
+both bounded-support distributions, but the linear-spacing arm is also
+bounded-support and does exhibit the residual, so bounded support is
+not the distinguishing feature. We do not offer a mechanistic
+explanation for the split.
+
+The practical consequence is that the frequency distribution is part of
+the metric's definition, and its choice matters for both the trajectory
+and the residual.
+
+\subsection{Orthogonality of the residual to standard HRV}
+
+To test whether the residual carries information beyond standard HRV,
+we regress it on the two features it is most correlated with in the
+pilot corpus --- the Poincar\'e SD1/SD2 ratio and the coefficient of
+variation of the RR series --- and compute the AUC of the
+orthogonalized residual.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lrr}
+\toprule
+Quantity & $\rho$ vs label & AUC \\
+\midrule
+Raw residual & $+0.675$ & $0.889$ \\
+Residual $\perp$ $(\mathrm{sd1/sd2}, \mathrm{cv})$ & $+0.375$ & $0.716$ \\
+\bottomrule
+\end{tabular}
+\caption{Orthogonality of the residual to standard HRV features. The
+residual retains an AUC of $0.716$ after orthogonalization, down from
+$0.889$.}
+\label{tab:orthogonality}
+\end{table}
+
+The orthogonalized residual retains AUC $0.716$. Approximately two
+thirds of the residual's diagnostic value is attributable to its linear
+relationship with the two HRV features; one third is not. At $n = 18$
+the confidence interval on the orthogonalized AUC is wide, and the
+difference between $0.889$ and $0.716$ is not statistically significant
+at this sample size.
+
+\subsection{Window-length dependence of the residual}
+
+The residual criterion of Section~4.2 was applied to full-record
+analyses. A subsequent window-length sweep shows that the residual is a
+record-level quantity: at 30-second windows the AUC is 0.50; at 1--5
+minute windows it plateaus at 0.66--0.68; at the full record it is
+0.83--0.89. The residual's within-record variance is 1.2--2.5 times
+its between-record variance, and its window-to-window variation does
+not correlate with window-level P-wave features. The criterion
+therefore validates a record-level diagnostic, not a within-record
+state tracker. The scope of the acceptance criterion is noted here for
+clarity; it does not change the per-arm results reported below.
+
+\subsection{Disjointness of trajectory and residual robustness}
+
+Table~\ref{tab:disjoint} reproduces the key columns of
+Tables~\ref{tab:trajectory} and~\ref{tab:residual-arms} side by side.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lrr}
+\toprule
+Arm & Trajectory $\rho$ vs A (K = 2) & Residual AUC (K = 2) \\
+\midrule
+A & $1.000$ & $0.889$ \\
+B & $0.052$ & $0.543$ \\
+C & $0.076$ & $0.852$ \\
+D & $0.051$ & $0.556$ \\
+E & $0.168$ & $0.840$ \\
+\bottomrule
+\end{tabular}
+\caption{Trajectory correlation and residual AUC are disjoint. Arm C
+has the second-lowest trajectory correlation and the second-highest
+residual AUC. Arm E has the highest trajectory correlation among the
+alternative arms and the second-highest residual AUC. Arms B and D
+fail on both metrics. No monotone relation exists between the two.}
+\label{tab:disjoint}
+\end{table}
+
+The pre-registered trajectory criterion, applied to the useful
+coupling regime, would report a failure for every arm. The residual
+criterion reports a failure for two of five. The two criteria do not
+identify the same arms as robust, and neither criterion subsumes the
+other.
+
+\section{Discussion}
+
+\subsection{What the protocol establishes}
+
+The protocol establishes two facts. First, the absolute value of the
+CSI is not robust to the frequency distribution at any useful coupling
+strength. This is a negative result about the metric's definition.
+Second, the residual diagnostic that the companion papers report is
+also not distribution-agnostic: three of five tested distributions
+exhibit it.
+
+Both facts condition the metric's interpretation. The CSI is a
+parameterized quantity; its value refers to a specific
+parameterization.
+
+\subsection{What the protocol does not establish}
+
+The protocol does not establish which distributions are physiologically
+appropriate, nor whether any of the tested distributions has a claim to
+physical significance. It does not establish the residual's behavior
+under nonlinear regression, under alternative orthogonality procedures,
+or on the full reference corpora. These are subjects for further work.
+
+\subsection{Implications for the regulatory pathway}
+
+For the FDA 510(k) pathway, the protocol demonstrates that the
+algorithm's absolute output depends on parameter choices in a
+documented way, and that the parameter dependence is quantified. The
+regulatory strategy described in the white paper treats the CSI as a
+research feature whose interpretation is conditioned on the
+parameterization, and the residual as a separately validated
+discriminative feature. Both postures are consistent with the results
+reported here.
+
+\section{Conclusion}
+
+This document specifies and reports a formal sensitivity analysis of
+the NeuroCardia Kuramoto phase engine against the PhysioNet reference
+databases. The absolute value of the CSI is not robust to the frequency
+distribution at any coupling strength where the metric has dynamic
+range. The residual diagnostic at $K = 2$ is exhibited by three of five
+tested frequency distributions. Trajectory robustness and residual
+robustness are disjoint properties of the metric, and the protocol's
+pre-registered trajectory criterion is not sufficient to validate the
+diagnostic.
+
+The results support the white paper's regulatory posture: the CSI is a
+research metric whose value is parameterized; the residual is a
+candidate diagnostic whose robustness is narrower than initially
+reported but is quantifiable and reproducible.
+
+\begin{thebibliography}{9}
+
+\bibitem{mitdb}
+G.~B.~Moody and R.~G.~Mark. The impact of the MIT-BIH Arrhythmia
+Database. \emph{IEEE Engineering in Medicine and Biology Magazine},
+20(3):45--50, 2001.
+
+\bibitem{nsrdb}
+R.~G.~Mark and G.~B.~Moody. MIT-BIH Normal Sinus Rhythm Database.
+PhysioNet, 1990. \url{https://physionet.org/content/nsrdb/}.
+
+\bibitem{afdb}
+G.~B.~Moody and R.~G.~Mark. MIT-BIH Atrial Fibrillation Database.
+PhysioNet, 1983. \url{https://physionet.org/content/afdb/}.
+
+\bibitem{pan1985}
+J.~Pan and W.~J.~Tompkins. A real-time QRS detection algorithm.
+\emph{IEEE Transactions on Biomedical Engineering},
+BME-32(3):230--236, 1985.
+
+\bibitem{kuramoto1975}
+Y.~Kuramoto. Self-entrainment of a population of coupled non-linear
+oscillators. In \emph{International Symposium on Mathematical Problems
+in Theoretical Physics}, pages 420--422. Springer, 1975.
+
+\bibitem{acebron2005}
+J.~A.~Acebr\'on, L.~L.~Bonilla, C.~J.~P\'erez Vicente, F.~Ritort, and
+R.~Spigler. The Kuramoto model: A simple paradigm for synchronization
+phenomena. \emph{Reviews of Modern Physics}, 77(1):137--185, 2005.
+
+\bibitem{scheffer2009}
+M.~Scheffer et al. Early-warning signals for critical transitions.
+\emph{Nature}, 461(7260):53--59, 2009.
+
+\bibitem{simoes2026engine}
+A.~Simoes. The Kuramoto Engine: Physics and Mathematics of the Cardiac
+Synchronization Index. Technical reference, revision 0.2, 2026.
+Companion document.
+
+\bibitem{simoes2026residual}
+A.~Simoes. The Kuramoto Residual: Phase-Domain Information in the
+Cardiac Rhythm Beyond Heart Rate Variability. Research paper, revision
+0.2, 2026. Companion document.
+
+\bibitem{simoes2026whitepaper}
+A.~Simoes. NeuroCardia: An Open-Source, On-Device Phase-Domain
+Diagnostic Engine for Single-Lead ECG. White paper, revision 0.2,
+2026. Companion document.
+
+\end{thebibliography}
+
+\end{document}

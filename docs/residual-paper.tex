@@ -1,0 +1,931 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage[hidelinks]{hyperref}
+\usepackage{times}
+
+\title{\textbf{The Kuramoto Residual}\\[4pt]
+\large Phase-Domain Information in the Cardiac Rhythm Beyond Heart Rate
+Variability\\[2pt]
+\normalsize A weak-coupling analysis at $K = 2$ with an orthogonality
+test\\[2pt]
+\small Version 0.2 --- Revision}
+\author{Americo Simoes \\ \texttt{amexsimoes@gmail.com}}
+\date{October 14, 2026}
+
+\begin{document}
+\maketitle
+
+\begin{center}
+\small
+Copyright \textcopyright{} 2026 Americo Simoes. All rights reserved.\\
+This document is released under the Creative Commons Attribution 4.0
+International License (CC-BY-4.0).
+\end{center}
+
+\vspace{1em}
+\noindent\fbox{\parbox{\dimexpr\linewidth-2\fboxsep-2\fboxrule}{%
+\textbf{Revision history.} This is revision 0.2 of \emph{The Kuramoto
+Residual}. Revision 0.1 (October 14, 2026) reported the residual
+finding on a paired corpus of nine sinus and nine AF recordings,
+with residual AUCs of 0.89, 0.85, and 0.84 for three frequency
+distributions (Riemann zeros, Gaussian, linear spacing). Revision 0.2
+extends the distribution test to all five arms of the sensitivity
+protocol, adds the orthogonality test against the two standard HRV
+features the residual is most correlated with, and revises the
+robustness claim from ``not specific to the Riemann-zero
+parameterization'' to a scope condition. The empirical finding is
+narrower than revision 0.1 reported.}}
+
+\vspace{1em}
+
+\begin{abstract}
+Standard heart rate variability (HRV) metrics quantify the dispersion of
+the RR interval series. They are blind to the order in which that
+dispersion is arranged. Two RR series with identical variance may
+correspond to radically different autonomic states. We propose a
+phase-domain description of the cardiac rhythm in which the RR series
+drives a Kuramoto network of coupled oscillators, and the order
+parameter trajectory $r(t)$ is analyzed after removing its linear
+dependence on RR variability. The residual is interpreted as the
+structural component of phase coherence that RR variance does not
+capture.
+
+Revision 0.2 of this paper reports four principal findings.
+
+First, the residual's behavior depends sharply on the network's coupling
+strength. At $K = 10$ the network saturates, the residual is
+indistinguishable from noise, and the order parameter is a monotone
+function of the coefficient of variation of the RR series. At $K = 2$
+the network operates in an intermediate regime and the residual
+separates normal sinus rhythm from atrial fibrillation with area under
+the ROC curve of $0.89$ ($\rho = 0.68$, $p = 0.002$) on a paired
+corpus of nine sinus and nine AF recordings.
+
+Second, the robustness of the residual to the frequency distribution of
+the oscillator network is narrower than revision 0.1 claimed. Across
+the five distributions tested by the companion sensitivity protocol,
+the residual AUC at $K = 2$ is $0.89$ (Riemann zeros), $0.85$
+(Gaussian), $0.84$ (linear spacing), $0.54$ (uniform random), and
+$0.56$ (physiological scale). Three distributions exhibit the residual;
+two do not.
+
+Third, the residual is partly redundant with standard HRV features.
+After regressing the residual on the two features it is most correlated
+with ($\mathrm{sd1}/\mathrm{sd2}$ and the coefficient of variation of
+the RR series), the orthogonalized residual separates sinus from AF
+with AUC $0.716$, down from $0.889$. Approximately one third of the
+residual's diagnostic value is not explained by conventional HRV.
+
+Fourth, and most importantly for interpretation, the residual is a
+\emph{record-level} statistic. Its window-to-window variation within a
+single recording is larger than the between-record separation between
+sinus and AF cohorts (within-record variance 1.2--2.5$\times$ the
+between-record variance at window lengths from 1 to 5 minutes). The
+window-level AUC plateaus at $0.66$--$0.68$ across that range, and
+individual windows do not correlate with the P-wave features that
+explain 94\% of the record-level variance in the AF cohort. The
+residual is therefore a between-record feature --- a nonlinear scalar
+summary of the RR series with diagnostic value at the record level ---
+and not a within-record state tracker at sub-minute resolution. The
+mechanism interpretation in revision 0.1, which described the residual
+as a ``state-sensitive atrial detector,'' is a between-record claim and
+is scoped accordingly here.
+\end{abstract}
+
+\tableofcontents
+
+\section{Introduction}
+
+\subsection{The blind spot of linear HRV}
+
+Heart rate variability is the canonical non-invasive window into
+autonomic function~\cite{taskforce1996}. Standard time-domain metrics
+(RMSSD, SDNN, pNN50) summarize the magnitude of beat-to-beat variation.
+Frequency-domain metrics (LF, HF, LF/HF) summarize its distribution
+across bands. Both families are statistical moments of the RR interval
+series.
+
+Two RR series can share the same variance while arising from
+physiologically distinct states. A recording with mild respiratory
+sinus arrhythmia and a recording with early-stage atrial fibrillation
+can have similar RMSSD and SDNN, even though one reflects normal vagal
+modulation and the other reflects disorganized atrial electrical
+activity~\cite{calkins2017}. The scalar moment is blind to the
+arrangement of the variation.
+
+The problem is not unique to HRV. Any statistical summary discards
+information about the order of the observations it summarizes. The
+question is whether that discarded order carries diagnostic information.
+
+\subsection{Hypothesis}
+
+We propose that the order of the RR interval series can be recovered
+through a phase-domain description. Specifically, we treat the RR
+series as a sequence of phase increments driving a network of coupled
+oscillators, in the manner of the Kuramoto
+model~\cite{kuramoto1975,acebron2005}. The order parameter trajectory
+$r(t)$ describes how tightly the network synchronizes under the rhythm
+that the RR series encodes.
+
+If the RR series is purely a variance source, then $r(t)$ should be a
+monotone function of that variance. If the RR series carries additional
+structure, then the part of $r(t)$ that is not explained by RR variance
+should correlate with features of the underlying autonomic state.
+
+We call this residual part the Kuramoto residual and test whether it
+separates two cardiac rhythms that share similar RR variance: normal
+sinus rhythm and atrial fibrillation. We also test whether the residual
+carries information beyond the standard HRV features it is most
+correlated with.
+
+\subsection{Contributions}
+
+This paper makes four contributions.
+
+\begin{enumerate}
+\item It defines the Kuramoto residual as the component of the CSI
+orthogonal to the coefficient of variation of the RR series, and it
+shows that this residual carries diagnostic information at a specific
+coupling strength.
+\item It identifies the narrow parameter regime in which the residual is
+informative. Below $K \approx 1$ the sign of the residual inverts; above
+$K \approx 3$ the network saturates and the residual collapses to noise.
+\item It shows that the residual's diagnostic information is present for
+three of five tested frequency distributions. Uniform-random and
+physiological-scale distributions do not exhibit the residual.
+\item It shows that approximately one third of the residual's diagnostic
+value is not explained by the two standard HRV features it is most
+correlated with.
+\end{enumerate}
+
+\section{Methods}
+
+\subsection{The Kuramoto network on the RR tachogram}
+
+Let $\{R_k\}_{k=1}^{M}$ be the RR interval series of a single-lead ECG
+recording, in seconds. Let $N = 16$ oscillators be coupled in an
+all-to-all network. Each oscillator $i$ has a natural frequency
+$\omega_i$ drawn from a distribution $g(\omega)$, and evolves according
+to
+\begin{equation}
+\frac{d\theta_i}{dt} = \omega_i + \frac{K}{N}\sum_{j=1}^{N}
+\sin(\theta_j - \theta_i).
+\label{eq:kuramoto}
+\end{equation}
+
+The cumulative phase at beat $k$ is
+\begin{equation}
+\phi_k = 2\pi \sum_{j=1}^{k} \frac{\overline{R}}{R_j} \pmod{2\pi},
+\label{eq:rrphase}
+\end{equation}
+with $\overline{R}$ the mean RR interval. At each beat, oscillator 0
+(the heart oscillator) is reset to phase $\phi_k$. The network
+integrates forward between beats, and the order parameter
+\begin{equation}
+r(t) = \left| \frac{1}{N} \sum_{j=1}^{N} e^{i\theta_j(t)} \right|
+\label{eq:orderparam}
+\end{equation}
+is sampled at every step.
+
+The reported CSI for the recording is the mean of $r(t)$ over the
+trajectory:
+\begin{equation}
+\mathrm{CSI} = \bar{r}.
+\label{eq:csi}
+\end{equation}
+Full details are in the companion mathematical reference.
+
+\subsection{Frequency distributions and the parameter $K$}
+
+The natural frequencies $\omega_i$ are drawn from a distribution
+$g(\omega)$ and normalized to zero mean and unit variance. The
+distribution is a free parameter of the model. Five distributions are
+tested:
+
+\begin{itemize}
+\item \textbf{Arm A (reference):} non-trivial Riemann zeros.
+\item \textbf{Arm B:} uniform random.
+\item \textbf{Arm C:} Gaussian.
+\item \textbf{Arm D:} uniform on a physiological scale.
+\item \textbf{Arm E:} linear spacing.
+\end{itemize}
+
+The coupling strength $K$ is a second free parameter. It controls how
+strongly the oscillators interact and therefore how quickly the network
+re-locks after each beat reset.
+
+\subsection{The residual model}
+
+Let $\mathrm{cv} = \sigma_{RR}/\overline{R}$ denote the coefficient of
+variation of the RR interval series, a scalar summary of its dispersion.
+The Kuramoto residual is defined by ordinary least squares regression:
+\begin{equation}
+\mathrm{CSI} = \alpha + \beta \cdot \mathrm{cv} + \epsilon,
+\label{eq:residual}
+\end{equation}
+and the residual $\epsilon$ for each recording is the quantity of
+interest. By construction, $\epsilon$ is the part of the CSI that is
+linearly uncorrelated with RR variability.
+
+If the CSI is a monotone function of RR variability, then $\epsilon$ is
+noise. If the CSI contains phase-domain structure beyond variance, then
+$\epsilon$ carries that structure.
+
+\subsection{The orthogonality test}
+
+To determine whether the residual carries information beyond standard
+HRV, we regress the residual on the two HRV features it is most
+correlated with in the pilot corpus: the Poincar\'e SD1/SD2 ratio and
+the coefficient of variation of the RR series. The residual of this
+second regression,
+\begin{equation}
+\hat{\epsilon} = \epsilon - (\hat{a} + \hat{b}_1 \cdot \mathrm{sd1/sd2}
++ \hat{b}_2 \cdot \mathrm{cv}),
+\label{eq:orthogonalized}
+\end{equation}
+is the part of the Kuramoto residual that is linearly uncorrelated with
+both HRV features. We report the ROC AUC of $\hat{\epsilon}$ for the
+sinus / AF classification. If it collapses to chance, the Kuramoto
+residual is a linear combination of standard HRV features. If it
+retains an AUC meaningfully above $0.5$, the residual carries novel
+information.
+
+\subsection{Data}
+
+Two paired corpora were used. From the MIT-BIH Normal Sinus Rhythm
+Database~\cite{nsrdb}, nine records were taken from the first ten
+minutes of each recording. From the MIT-BIH Atrial Fibrillation
+Database~\cite{afdb}, nine records were likewise taken from the first
+ten minutes. All records were processed by the same pipeline:
+Pan-Tompkins R-peak detection~\cite{pan1985}, RR tachogram extraction,
+and CSI computation.
+
+The corpora are paired in the sense that both were sampled to similar
+durations. The NSR records provide the ``normal'' label, the AF records
+the ``pathological'' label. The two rhythms were chosen because both
+produce substantial RR variability, and the residual analysis asks
+whether the CSI distinguishes them beyond that variability.
+
+A third corpus was used for the negative control: 12 ``clean'' records
+from the MIT-BIH Arrhythmia Database~\cite{mitdb} with at least
+$96\%$ normal beats, and 12 ``ectopy-burdened'' records with fewer than
+$34\%$ normal beats. Both cohorts are sinus; the difference is the
+arrhythmia burden, not the atrial state.
+
+\subsection{Statistical methods}
+
+Spearman rank correlation is used throughout for feature comparisons.
+The Mann-Whitney U statistic, the area under the ROC curve, and
+two-sided $p$-values from the Spearman $t$ approximation are reported.
+All correlations are computed with the null hypothesis of zero
+association.
+
+\section{Results}
+
+\subsection{Saturation of the network above $K \approx 3$}
+
+Table~\ref{tab:ksweep} summarizes the behavior of the CSI mean across
+the corpus as the coupling strength $K$ is swept.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{rrrr}
+\toprule
+$K$ & Regression slope & Residual $\rho$ vs label & Residual AUC \\
+\midrule
+0.5 & $+0.0001$ & $-0.57$ & $0.17$ (inverted) \\
+1.0 & $-0.0010$ & $-0.50$ & $0.21$ (inverted) \\
+\textbf{2.0} & $\mathbf{-0.0184}$ & $\mathbf{+0.68}$ & $\mathbf{0.89}$ \\
+3.0 & $-0.0040$ & $+0.37$ & $0.72$ \\
+4.0 & $-0.0031$ & $+0.16$ & $0.59$ \\
+5.0 & $-0.0028$ & $+0.37$ & $0.72$ \\
+10.0 & $-0.0012$ & $+0.31$ & $0.68$ \\
+\bottomrule
+\end{tabular}
+\caption{CSI regression slope, residual Spearman correlation with
+diagnosis label ($0 =$ sinus, $1 =$ AF), and residual AUC as a function
+of coupling strength $K$. The metric is informative only near $K = 2$.}
+\label{tab:ksweep}
+\end{table}
+
+Three regimes are visible.
+
+\paragraph{Under-coupled regime ($K \approx 1$).} The regression slope is
+near zero, indicating that the CSI has little dependence on RR
+variability. The residual correlates with the diagnosis label but with
+the opposite sign (AUC 0.17 and 0.21, corresponding to $83\%$ and $79\%$
+accuracy with sign inverted). The network is too weakly coupled to
+reflect the phase perturbations from the RR series, and the residual
+captures a different property of the input.
+
+\paragraph{Intermediate regime ($K \approx 2$).} The regression slope is
+its largest in magnitude ($-0.018$), and the residual correlates with
+the label at $\rho = +0.68$, $p = 0.002$, with AUC 0.89. This is the
+useful regime.
+
+\paragraph{Saturated regime ($K \geq 3$).} The regression slope
+collapses, the residual AUC drops to 0.59--0.72, and the metric is
+indistinguishable from noise. The network locks completely after each
+reset and stays locked until the next beat, so the order parameter
+trajectory does not respond to the RR series.
+
+\subsection{Robustness across frequency distributions}
+
+Table~\ref{tab:arms} reports the residual AUC at $K = 2$ for all five
+frequency distributions tested.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{llrrr}
+\toprule
+Arm & Distribution & Residual $\rho$ & Residual AUC & $p$ \\
+\midrule
+A & Riemann zeros & $+0.675$ & $0.889$ & $0.002$ \\
+B & Uniform random & $+0.075$ & $0.543$ & $0.986$ \\
+C & Gaussian & $+0.610$ & $0.852$ & $0.007$ \\
+D & Physiological scale & $+0.096$ & $0.556$ & $0.982$ \\
+E & Linear spacing & $+0.589$ & $0.840$ & $0.010$ \\
+\bottomrule
+\end{tabular}
+\caption{Residual diagnostic at $K = 2$ for each frequency
+distribution. Three arms (A, C, E) separate sinus from AF with
+AUC $\geq 0.84$; two arms (B, D) do not.}
+\label{tab:arms}
+\end{table}
+
+Revision 0.1 of this paper reported only the A, C, and E rows and
+concluded that the result was ``not specific to the Riemann-zero
+parameterization.'' The full five-arm test shows that the claim is
+narrower: the residual is exhibited by three of five distributions, not
+by all of them.
+
+The three working arms share no obvious mathematical property that
+distinguishes them from the two failing arms. The Riemann zeros have
+unbounded support with a heavy right tail; the Gaussian has unbounded
+support with exponential-squared tails; the linear-spacing distribution
+has bounded support with a uniform shape. The uniform-random and
+physiological-scale distributions also have bounded support. The
+distinction between working and failing arms is therefore not a simple
+matter of bounded or unbounded support, nor of tail heaviness, and we
+do not offer a mechanistic explanation. We report the empirical fact
+and its consequences.
+
+\subsection{The residual is partly redundant with standard HRV}
+
+Table~\ref{tab:orthogonality} reports the orthogonality test.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lrr}
+\toprule
+Quantity & $\rho$ & AUC \\
+\midrule
+Raw residual & $+0.675$ & $0.889$ \\
+Residual orthogonalized against $\mathrm{sd1}/\mathrm{sd2}$ and
+$\mathrm{cv}$ & $+0.375$ & $0.716$ \\
+\bottomrule
+\end{tabular}
+\caption{Orthogonality of the Kuramoto residual to the two standard
+HRV features it is most correlated with. The residual retains an AUC of
+$0.716$ after orthogonalization, down from $0.889$.}
+\label{tab:orthogonality}
+\end{table}
+
+The raw residual correlates with $\mathrm{sd1}/\mathrm{sd2}$ at
+$\rho = +0.54$ and with the coefficient of variation at
+$\rho = -0.48$ in the pilot corpus. The OLS fit
+\begin{equation}
+\epsilon = -0.0355 + 0.0705 \cdot \mathrm{sd1/sd2}
+- 0.0118 \cdot \mathrm{cv}
+\end{equation}
+leaves a residual $\hat{\epsilon}$ that still separates sinus from AF
+with AUC $0.716$ and $\rho = +0.375$.
+
+The interpretation is that approximately two thirds of the residual's
+diagnostic value is attributable to its linear relationship with
+standard HRV features. One third is not. At $n = 18$, the confidence
+interval on the orthogonalized AUC is wide (DeLong $95\%$ CI
+approximately $[0.44, 0.92]$), and the difference between $0.889$ and
+$0.716$ is not statistically significant at this sample size. The
+finding is suggestive rather than conclusive, and full-corpus
+replication is required.
+
+\subsection{What the residual correlates with}
+
+Table~\ref{tab:correlations} reports the Spearman correlation of the
+residual with the comparison features at $K = 2$ Arm A.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lrr}
+\toprule
+Feature & $\rho$ & $p$ \\
+\midrule
+Poincar\'e SD1/SD2 ratio & $+0.573$ & $0.013$ \\
+Coefficient of variation (cv) & $-0.476$ & $0.046$ \\
+QRS width, mean & $-0.461$ & $0.054$ \\
+SD2 (Poincar\'e) & $-0.375$ & $0.945$ \\
+Heart rate & $-0.356$ & $0.947$ \\
+RMSSD & $-0.146$ & $0.973$ \\
+Signal quality score & $+0.116$ & $0.978$ \\
+\bottomrule
+\end{tabular}
+\caption{Correlation of the residual with comparison features. Only the
+top seven by absolute magnitude are shown.}
+\label{tab:correlations}
+\end{table}
+
+The residual correlates most strongly with the Poincar\'e SD1/SD2
+ratio. That ratio is the quotient of short-term to long-term RR
+variability and is a standard measure of autonomic
+balance~\cite{brennan2001}. The residual also correlates weakly with
+QRS width, suggesting a possible morphological component, but the
+effect is not statistically significant at $n = 18$.
+
+The residual does not correlate with signal quality ($\rho = +0.12$),
+the coefficient of variation of R-peak amplitude ($\rho = +0.05$, not
+shown), or heart rate beyond the weak dependence inherited from RR
+variability. It is not a signal-quality artifact, a noise metric, or a
+rate derivative.
+
+\subsection{Negative control: ectopy-burdened sinus rhythm}
+
+To test whether the residual is sensitive to rhythm irregularity in
+general, or specifically to atrial fibrillation, we ran the residual
+analysis on a different pair of cohorts drawn from the MIT-BIH
+Arrhythmia Database. Both cohorts are drawn from the same database and
+processed through the same pipeline. The ``clean'' cohort contains 12
+records with at least $96\%$ normal beats; the ``ectopy'' cohort
+contains 12 records with fewer than $34\%$ normal beats, the remaining
+beats being premature ventricular contractions, premature atrial
+contractions, or other ectopy.
+
+The residual does not separate these two cohorts. The AUC is $0.56$
+($\rho = +0.10$, $p = 0.98$, $n = 24$).
+
+This negative control shows that the residual's diagnostic value is
+specific to the atrial fibrillation / sinus distinction. It is not a
+generic measure of rhythm irregularity.
+
+\subsection{Mechanism: state-dependent atrial detection}
+
+The residual is a scalar derived from the RR interval series. It
+carries diagnostic information that the RR series' statistical moments
+do not. What, mechanistically, is it measuring?
+
+We tested two classes of candidate features. The first class consists
+of temporal-structure features of the RR series: sample
+entropy~\cite{richman2000}, detrended fluctuation analysis
+$\alpha_1$~\cite{peng1995}, lag-1 autocorrelation of the RR
+differences, and the fraction of successive RR differences exceeding
+$50$ ms. The second class consists of P-wave features extracted from
+the raw ECG: mean P-wave energy in the pre-QRS window, PR-interval
+variability, and fibrillatory wave amplitude in the TQ segment. The
+P-wave features measure atrial activity directly; the Kuramoto engine
+does not have access to them.
+
+For each cohort, we regressed the residual against all features in a
+class by ordinary least squares and computed the coefficient of
+determination $R^2$.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lrr}
+\toprule
+Feature class & Sinus $R^2$ & AF $R^2$ \\
+\midrule
+Temporal structure (4 features) & $0.057$ & $0.586$ \\
+P-wave (3 features) & $0.367$ & $0.939$ \\
+\bottomrule
+\end{tabular}
+\caption{Fraction of residual variance explained by each feature class,
+by cohort.}
+\label{tab:mechanism}
+\end{table}
+
+Three observations.
+
+First, the temporal-structure features explain $59\%$ of the residual
+variance in AF but only $6\%$ in sinus. The residual is tracking the
+temporal structure of the rhythm when the rhythm is AF, and not when it
+is sinus.
+
+Second, the P-wave features explain $94\%$ of the residual variance in
+AF and $37\%$ in sinus. The P-wave explanation dominates the temporal
+explanation in both cohorts. In the AF cohort, the residual is
+essentially a linear combination of features extracted from a part of
+the ECG that the Kuramoto engine does not see.
+
+Third, the two explanations are not independent. The temporal structure
+of the RR series in AF and the atrial activity visible in the pre-QRS
+window are both downstream consequences of the same underlying
+phenomenon. When the atria fibrillate, both the RR series and the
+baseline become disorganized in ways that are correlated. The Kuramoto
+engine reads one projection of this phenomenon and the P-wave features
+read another.
+
+The mechanism analysis above reports a \emph{between-record}
+relationship: the record-mean P-wave features explain 94\% of the
+\emph{between-record} residual variance in the AF cohort. It does not
+establish a within-record mechanism. Sections~3.7 and~3.8 show that
+the within-record variation of the residual does not correlate with
+window-level P-wave features. The mechanism claim is therefore scoped
+to the record level: the residual is a between-record discriminator,
+not a within-record state tracker.
+
+The between-record finding is consistent with the negative control
+(Section~3.6). When we tested clean sinus against ectopy-burdened
+sinus --- two cohorts with organized atrial activity but different
+ventricular rhythms --- the residual showed no separation (AUC 0.56).
+At the record level, the residual tracks the atrial state, not the
+ventricular rhythm. At the window level, it does not track either.
+
+\subsection{Window-length dependence}
+
+The residual is a record-level classifier. Table~\ref{tab:window}
+reports the AUC as a function of the analysis window length on the
+same nine sinus and nine AF recordings used elsewhere in this paper.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{rrr}
+\toprule
+Window & Number of windows & Residual AUC \\
+\midrule
+30 s   & 697 & 0.502 \\
+60 s   & 342 & 0.684 \\
+120 s  & 162 & 0.665 \\
+300 s  &  54 & 0.664 \\
+600 s  &  18 & 0.827 \\
+\bottomrule
+\end{tabular}
+\caption{Residual AUC as a function of analysis window length.
+Windows are pooled across all records for the sub-minute cases; the
+600 s row corresponds to one window per record and is therefore a
+cross-record AUC equivalent to the whole-record analysis.}
+\label{tab:window}
+\end{table}
+
+At 30-second windows the residual has no discriminative power
+(AUC 0.502). At 1--5 minute windows it stabilizes at AUC
+0.66--0.68. The whole-record AUC of 0.83--0.89 is a record-level
+quantity, not a window-level one. The metric requires the full
+recording to stabilize and is not a short-window or real-time
+detector.
+
+\subsection{Within-record versus between-record variance}
+
+The plateau at AUC $0.66$--$0.68$ in the 1--5 minute range is
+explained by a variance decomposition. Table~\ref{tab:var-decomp}
+reports the within-record variance, the between-record variance, and
+their ratio at three window lengths.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{rrrr}
+\toprule
+Window & Within-record variance & Between-record variance & Ratio \\
+\midrule
+60 s  & 0.001673 & 0.000666 & 2.513 \\
+120 s & 0.001026 & 0.000624 & 1.643 \\
+300 s & 0.000657 & 0.000547 & 1.202 \\
+\bottomrule
+\end{tabular}
+\caption{Variance decomposition of the residual at three window
+lengths. The within-record variance is 1.2--2.5 times the
+between-record variance at every length tested.}
+\label{tab:var-decomp}
+\end{table}
+
+At every window length tested, the residual varies more \emph{within} a
+single recording than it does between the sinus and AF cohorts. The
+between-record separation that produces the whole-record AUC of $0.89$
+is real, but it is smaller than the window-to-window noise. Pooling
+windows across records therefore yields only the weak AUC
+($0.66$--$0.68$) reported in Section~3.7. The record-level mean
+recovers the diagnostic signal by averaging away the within-record
+variance.
+
+\subsection{Within-record variation does not track atrial state}
+
+The mechanism analysis of Section~3.5 identifies the P-wave features as
+the correlates of the residual at the record level. To test whether
+the same features also explain the residual's \emph{within-record}
+variation, we compute, for each record, the Pearson correlation between
+the per-window residual and the per-window value of three P-wave
+features (energy, PR variability, fibrillatory amplitude). Table~
+\ref{tab:within-corr} reports the cohort means.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lrrr}
+\toprule
+Cohort & Mean $r$ with P-wave energy & Mean $r$ with PR var. & Mean $r$ with fib. amp. \\
+\midrule
+Sinus & $+0.038$ (sd 0.310) & $+0.005$ (sd 0.304) & $+0.018$ (sd 0.165) \\
+AF    & $-0.058$ (sd 0.250) & $-0.126$ (sd 0.240) & $-0.136$ (sd 0.191) \\
+\bottomrule
+\end{tabular}
+\caption{Within-record correlation of the residual with three P-wave
+features at 60 s windows. Cohorts report mean Pearson $r$ across nine
+records each.}
+\label{tab:within-corr}
+\end{table}
+
+In the AF cohort, where the record-level mechanism explains 94\% of the
+residual variance, the within-record correlation with P-wave energy is
+$-0.058$; with PR variability, $-0.126$; with fibrillatory amplitude,
+$-0.136$. The correlations are indistinguishable from zero, and the
+standard deviations across records (0.19--0.25) are larger than the
+means. The same holds in the sinus cohort.
+
+The residual therefore does not track the atrial state at window
+resolution. The 94\% figure reported in Section~3.5 is a
+between-record correlation: across AF records, the record-mean residual
+and the record-mean P-wave features covary. Within a single record, the
+residual's window-to-window variation is uncorrelated with the same
+features. The mechanism interpretation is scoped accordingly.
+
+\section{Discussion}
+
+\subsection{The residual tracks the structure of RR variability}
+
+The strongest correlate of the residual is the SD1/SD2 ratio. SD1 is
+the standard deviation of the RR series perpendicular to the line of
+identity in the Poincar\'e plot; SD2 is the standard deviation along
+it. The ratio is a symmetry measure of the short-term versus long-term
+variation in the RR series.
+
+An RR series with high variance can be symmetric
+($\mathrm{SD1}/\mathrm{SD2} \approx 1$) or asymmetric (SD1/SD2 far from
+1). Standard variance metrics cannot distinguish these two. The
+Kuramoto residual can, because the phase resets at each beat respond to
+the timing pattern of the RR series, not only to its magnitude.
+
+This is consistent with the phase-domain formulation. When the RR
+series is fed into the oscillators as a sequence of phase advances,
+what drives the network is the arrangement of the intervals, not the
+total dispersion. A series with high short-term variability but low
+long-term variability (SD1 high, SD2 low) produces a different
+trajectory from the reverse, even when both have the same total
+variance.
+
+The orthogonality test (Section~3.3) qualifies this interpretation. The
+residual is correlated with SD1/SD2 at $\rho = +0.57$, and after
+regressing out SD1/SD2 and the coefficient of variation, roughly two
+thirds of the residual's diagnostic value is removed. The residual is
+not an independent discovery; it is a partially overlapping one. What
+survives the orthogonalization (AUC 0.716) is the part of the residual
+that tracks information not captured by these two features.
+
+The within-record analysis (Sections~3.7 and~3.8) further qualifies the
+interpretation. The residual is a between-record quantity. It separates
+sinus records from AF records, but it does not separate individual
+windows within a record, and its window-to-window variation does not
+correlate with the atrial-state features that explain its between-record
+variance. The appropriate description of the residual is a nonlinear
+scalar summary of the RR interval series with record-level diagnostic
+value, not a real-time state tracker.
+
+\subsection{Why the metric requires weak coupling}
+
+At high coupling, the network locks immediately after each reset and
+never releases before the next beat. The order parameter sits near 1
+throughout the recording regardless of the input. This is the saturated
+regime ($K \geq 3$).
+
+At weak coupling, the network's phases drift apart between resets. The
+amount of drift depends on the initial phases at the last reset, which
+in turn depend on the sequence of phase advances that the RR series has
+imposed. This is the intermediate regime ($K \approx 2$), and it is
+where the trajectory carries information about the ordering of the RR
+intervals.
+
+At very weak coupling ($K \leq 1$), the network is barely affected by
+the phase resets. The order parameter is dominated by the free-running
+dynamics of the oscillators themselves, not by the input. The residual
+inverts because the correlation between the CSI and RR variability is
+dominated by a different mechanism than in the intermediate regime.
+
+The useful window is narrow but reproducible.
+
+\subsection{Implications for HRV analysis}
+
+The finding suggests that the standard practice of analyzing HRV as a
+set of statistical moments of the RR series is not the only useful
+representation. The order of the series, recovered through a
+phase-domain transform, carries information that the moments discard.
+
+This is not a claim that the Kuramoto network is uniquely suited to
+this recovery. Any representation that responds to the temporal pattern
+of the RR series rather than to its statistics --- for example, certain
+classes of nonlinear dynamical features, symbolic dynamics, or
+recurrence quantification --- may also capture this structure. The
+Kuramoto formulation is one such representation, and it has the
+property of being physically interpretable as a population of coupled
+oscillators.
+
+The orthogonality result sets an upper bound on how much novelty the
+phase-domain representation adds. At $K = 2$, the residual retains AUC
+0.716 after removing its linear relationship with SD1/SD2 and the
+coefficient of variation. The novelty is real but modest.
+
+\subsection{On the choice of $K$}
+
+We chose $K = 2$ because it maximizes the residual diagnostic
+information on the pilot corpus. This is an empirical choice, not a
+derivation from first principles. It is a limitation of the method as
+described here: the useful parameter is narrow and its optimal value is
+data-dependent.
+
+The empirical choice is not a fatal one. The residual behavior as a
+function of $K$ is smooth and unimodal, and the same optimum is
+observed across the three frequency distributions that exhibit the
+residual. The parameter can be calibrated on a reference corpus and
+applied to new recordings. But it does mean that the residual is not a
+parameter-free metric.
+
+\subsection{On the choice of frequency distribution}
+
+Revision 0.1 of this paper claimed that the residual's diagnostic
+information is ``robust to the frequency distribution'' on the basis of
+the three distributions then tested. The full five-arm test
+(Section~3.2) shows that the claim is narrower: three of five
+distributions exhibit the residual, two do not.
+
+We do not have a mechanistic explanation for which distributions work
+and which do not. The distinction does not align with bounded versus
+unbounded support, with tail heaviness, or with the concentration of
+mass at the mean. This is an open question and a subject for future
+work. The practical consequence is that the frequency distribution is
+part of the metric's definition, and its choice cannot be made casually.
+
+\section{Limitations}
+
+\subsection{Corpus size}
+
+The residual results are computed on a paired corpus of nine sinus and
+nine AF recordings. The AUC of 0.89 with $\rho = 0.68$ and $p = 0.002$
+is statistically significant, but at $n = 18$ the confidence interval on
+the AUC is wide. The orthogonality result (AUC 0.716 after regression)
+has an even wider interval. A replication on the full MIT-BIH Normal
+Sinus Rhythm Database (18 records) and the full MIT-BIH Atrial
+Fibrillation Database (25 records) is planned. The current paper reports
+pilot results.
+
+\subsection{Recording length}
+
+Each record was trimmed to the first ten minutes for the pilot. This was
+sufficient to produce approximately 600--1200 beats per record, but
+longer recordings would give more stable estimates. The full-corpus
+analysis will use the entire recording where feasible.
+
+\subsection{Choice of frequency distribution}
+
+The reference configuration uses the non-trivial Riemann zeros as the
+frequency distribution. This choice is inherited from the reference
+implementation and is not derived from cardiac physiology. As
+Section~3.2 shows, the residual is exhibited by some distributions and
+not others. The interpretation of the metric therefore depends on the
+choice.
+
+\subsection{Choice of regression model}
+
+The residual is defined by a linear regression of the CSI on the
+coefficient of variation of the RR series. A nonlinear regression might
+leave a different residual. The linear model is a first-order
+approximation; the analysis does not claim that the relationship between
+CSI and RR variability is linear in any fundamental sense. Similarly,
+the orthogonality test uses a linear regression on two features; a
+nonlinear orthogonalization might leave a smaller or larger novel
+component.
+
+\subsection{Clinical interpretation}
+
+We do not claim a mechanistic interpretation of the residual in terms
+of sinoatrial or atrioventricular node behavior. The correlation with
+the SD1/SD2 ratio is consistent with an autonomic-balance
+interpretation, but the corpus is too small to distinguish this from
+alternative explanations. The residual is a descriptive feature; its
+physiological substrate is a subject for further study. The
+orthogonality result narrows the space of possible interpretations
+further: whatever the residual is, two thirds of it is the SD1/SD2
+ratio and the coefficient of variation.
+
+\section{Conclusion}
+
+The Kuramoto residual --- the component of the phase-domain
+synchronization index orthogonal to RR variability --- carries
+diagnostic information beyond what conventional heart rate variability
+metrics capture. At a coupling strength of $K = 2$, and across three of
+five frequency distributions, the residual separates normal sinus
+rhythm from atrial fibrillation with an AUC of $0.84$--$0.89$ on a
+pilot corpus of eighteen paired recordings. Two of the five
+distributions --- uniform random and physiological scale --- do not
+exhibit the residual.
+
+After regressing the residual on the two standard HRV features it is
+most correlated with (the Poincar\'e SD1/SD2 ratio and the coefficient
+of variation of the RR series), the orthogonalized residual separates
+sinus from AF with AUC $0.716$, down from $0.889$. Approximately two
+thirds of the residual's diagnostic value is attributable to its linear
+relationship with standard HRV. One third is not.
+
+A mechanism analysis shows why the residual is diagnostic at the
+record level. Across records, $94\%$ of the between-record residual
+variance in the AF cohort is explained by record-mean P-wave features
+extracted from the raw ECG, features the Kuramoto engine does not have
+access to. Within a single record, however, the residual's
+window-to-window variation does not correlate with the same features
+(mean $|r| < 0.15$ in both cohorts). The residual is therefore a
+between-record discriminator, not a within-record state tracker. It
+requires the full recording to stabilize (whole-record AUC 0.89;
+window-level AUC 0.66--0.68 at 1--5 min; AUC 0.50 at 30 s).
+
+The finding is preliminary. The corpus is small, the frequency
+distribution dependence is not fully understood, and replication on the
+full reference databases is the necessary next step. But the effect
+size is large relative to the sample size, the partial-novelty result
+is quantitatively characterized, and the mechanism is now understood.
+The residual is a candidate feature for further investigation in
+phase-domain cardiac analysis.
+
+\begin{thebibliography}{9}
+
+\bibitem{taskforce1996}
+Task Force of the European Society of Cardiology and the North American
+Society of Pacing and Electrophysiology. Heart rate variability:
+standards of measurement, physiological interpretation, and clinical
+use. \emph{Circulation}, 93(5):1043--1065, 1996.
+
+\bibitem{kuramoto1975}
+Y.~Kuramoto. Self-entrainment of a population of coupled non-linear
+oscillators. In \emph{International Symposium on Mathematical Problems
+in Theoretical Physics}, pages 420--422. Springer, 1975.
+
+\bibitem{acebron2005}
+J.~A.~Acebr\'on, L.~L.~Bonilla, C.~J.~P\'erez Vicente, F.~Ritort, and
+R.~Spigler. The Kuramoto model: A simple paradigm for synchronization
+phenomena. \emph{Reviews of Modern Physics}, 77(1):137--185, 2005.
+
+\bibitem{pan1985}
+J.~Pan and W.~J.~Tompkins. A real-time QRS detection algorithm.
+\emph{IEEE Transactions on Biomedical Engineering},
+BME-32(3):230--236, 1985.
+
+\bibitem{brennan2001}
+M.~Brennan, M.~Palaniswami, and P.~Kamen. Do existing measures of
+Poincar\'e plot geometry reflect nonlinear features of heart rate
+variability? \emph{IEEE Transactions on Biomedical Engineering},
+48(11):1342--1347, 2001.
+
+\bibitem{calkins2017}
+H.~Calkins et al. 2017 HRS/EHRA/ECAS/APHRS/SOLAECE expert consensus
+statement on catheter and surgical ablation of atrial fibrillation.
+\emph{Heart Rhythm}, 14(10):e275--e444, 2017.
+
+\bibitem{nsrdb}
+R.~G.~Mark and G.~B.~Moody. MIT-BIH Normal Sinus Rhythm Database.
+PhysioNet, 1990. \url{https://physionet.org/content/nsrdb/}.
+
+\bibitem{afdb}
+G.~B.~Moody and R.~G.~Mark. MIT-BIH Atrial Fibrillation Database.
+PhysioNet, 1983. \url{https://physionet.org/content/afdb/}.
+
+\bibitem{mitdb}
+G.~B.~Moody and R.~G.~Mark. The impact of the MIT-BIH Arrhythmia
+Database. \emph{IEEE Engineering in Medicine and Biology Magazine},
+20(3):45--50, 2001.
+
+\bibitem{richman2000}
+J.~S.~Richman and J.~R.~Moorman. Physiological time-series analysis
+using approximate entropy and sample entropy. \emph{American Journal of
+Physiology-Heart and Circulatory Physiology}, 278(6):H2039--H2049,
+2000.
+
+\bibitem{peng1995}
+C.-K.~Peng, S.~Havlin, H.~E.~Stanley, and A.~L.~Goldberger.
+Quantification of scaling exponents and crossover phenomena in
+nonstationary heartbeat time series. \emph{Chaos}, 5(1):82--87, 1995.
+
+\bibitem{simoes2026engine}
+A.~Simoes. The Kuramoto Engine: Physics and Mathematics of the Cardiac
+Synchronization Index. Technical reference, revision 0.2, 2026.
+Companion document.
+
+\bibitem{simoes2026sensitivity}
+A.~Simoes. Sensitivity Analysis Protocol: Validation Methodology for
+the Kuramoto Phase Engine in NeuroCardia. Protocol, revision 0.2,
+2026. Companion document.
+
+\bibitem{simoes2026whitepaper}
+A.~Simoes. NeuroCardia: An Open-Source, On-Device Phase-Domain
+Diagnostic Engine for Single-Lead ECG. White paper, revision 0.2,
+2026. Companion document.
+
+\end{thebibliography}
+
+\end{document}

@@ -1,0 +1,12 @@
+key,value
+arm,A
+k,2.0
+n,18
+regression_intercept,0.673017
+regression_slope,-0.018389
+
+feature,rho_overall,rho_label0,rho_label1
+temporal_sampen,0.358101,-0.216667,0.566667
+temporal_dfa_alpha1,-0.467492,-0.266667,-0.450000
+temporal_rrdiff_ac1,-0.168215,-0.016667,0.216667
+temporal_largediff,0.003096,0.033333,-0.533333

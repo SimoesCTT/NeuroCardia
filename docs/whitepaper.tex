@@ -1,0 +1,816 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage[hidelinks]{hyperref}
+\usepackage{times}
+
+\title{\textbf{NeuroCardia}\\[4pt]
+\large An Open-Source, On-Device Phase-Domain Diagnostic Engine for
+Single-Lead ECG\\[4pt]
+\normalsize White Paper --- Technical and Regulatory Overview\\[2pt]
+\small Version 0.2 --- Revision}
+\author{Americo Simoes \\ \texttt{amexsimoes@gmail.com}}
+\date{October 14, 2026}
+
+\begin{document}
+\maketitle
+
+\begin{center}
+\small
+Copyright \textcopyright{} 2026 Americo Simoes. All rights reserved.\\
+This white paper is released under the Creative Commons Attribution 4.0
+International License (CC-BY-4.0). The software described in this
+document is released under the GNU General Public License, version 3 or
+later (GPL-3.0-or-later).
+\end{center}
+
+\vspace{1em}
+\noindent\fbox{\parbox{\dimexpr\linewidth-2\fboxsep-2\fboxrule}{%
+\textbf{Revision history.} This is revision 0.2 of the NeuroCardia
+White Paper. Revision 0.1 (October 14, 2026) reported the pilot results
+of the Kuramoto residual (AUC 0.89 on a paired corpus of nine sinus and
+nine AF recordings) and the trajectory-correlation outcome of the
+five-arm sensitivity analysis. Revision 0.2 adds: the residual AUC for
+all five experimental arms (two of which do not exhibit the residual);
+the orthogonality result (the residual retains AUC 0.716 after
+regressing out $\mathrm{sd1}/\mathrm{sd2}$ and the coefficient of
+variation); the finding that trajectory robustness and residual
+robustness are disjoint; and a scope condition on the residual's
+frequency-distribution dependence. The regulatory strategy is
+unchanged. The list of claims requiring additional validation now
+includes residual orthogonality to standard HRV.}}
+
+\vspace{1em}
+
+\begin{abstract}
+NeuroCardia is a free, open-source Android application for offline,
+on-device analysis of single-lead electrocardiogram (ECG) recordings.
+It requires no network connection, no user accounts, and no telemetry;
+every computation runs on the handset, and the application functions
+identically in airplane mode. The application computes conventional
+heart rate variability (HRV) metrics, a four-axis signal quality score,
+and a phase-domain Cardiac Synchronization Index (CSI) derived from a
+Kuramoto coupled-oscillator network driven by the RR tachogram. Its DSP
+and I/O layers are packaged as standalone Kotlin/JVM modules that can be
+reused in any JVM project.
+
+This document specifies the computational model, the diagnostic
+metrics, the validation strategy against public reference datasets, and
+a preliminary regulatory pathway toward FDA clearance as a Class II
+medical device under 510(k). It is explicit about which claims are
+literature-supported, which are novel and awaiting validation, and
+which are research hypotheses. The CSI is presented as a research
+feature, not a clinical diagnostic; the application's primary
+contribution is the deployment envelope --- open-source, offline,
+on-device ECG analysis on commodity Android hardware. The source code
+is released under GPL-3.0-or-later.
+\end{abstract}
+
+\tableofcontents
+
+\section{Introduction}
+
+\subsection{Motivation}
+
+Heart rate variability analysis has been clinically accepted for
+decades as a window into autonomic function~\cite{taskforce1996}. The
+algorithms are mature and well-understood. What is not widely available
+is a \emph{deployment envelope} in which those algorithms can be run
+without a workstation, without a network connection, and without
+sending patient data to a third party.
+
+The dominant open-source tools for ECG and HRV analysis ---
+predominantly Python-based research stacks --- assume a workstation, a
+network connection, and a user comfortable with a command line. Field
+clinicians, rural health workers, air-gapped research environments, and
+privacy-sensitive deployments are left without validated, offline
+alternatives. Commercial Holter analysis software is closed-source and
+typically tied to a specific vendor's hardware. The gap is not in the
+algorithms; it is in the delivery.
+
+NeuroCardia addresses that gap with four design commitments.
+
+\begin{enumerate}
+\item \textbf{On-device only.} No cloud, no accounts, no telemetry. The
+application functions identically in airplane mode. Every computation,
+from R-peak detection to diagnostic report generation, runs on the
+handset.
+\item \textbf{Open source.} GPL-3.0-or-later. Every algorithm is
+auditable, reproducible, and forkable. There is no proprietary binary
+blob and no vendor lock-in.
+\item \textbf{Reusable modules.} The DSP and I/O layers are packaged as
+pure-Kotlin/JVM libraries with no Android dependency. They can be
+consumed by any JVM project and tested in under a second, independent
+of the Android application that uses them.
+\item \textbf{Standard metrics first, novel metrics clearly labeled.}
+Time-domain and frequency-domain HRV metrics are computed using
+standard formulations and are the application's validated outputs. The
+phase-domain Cardiac Synchronization Index is presented as a research
+feature whose record-level diagnostic behavior is documented in the
+companion residual paper and whose clinical utility is not yet
+established.
+\end{enumerate}
+
+The primary contribution of the project is not a new algorithm. It is
+the combination of standard algorithms with a deployment envelope that
+does not require network access, third-party services, or a specific
+hardware vendor.
+
+\subsection{Scope of this document}
+
+This white paper specifies: the computational model
+(Section~\ref{sec:model}), the diagnostic metrics and their intended
+clinical meaning (Section~\ref{sec:metrics}), the validation strategy
+against public datasets (Section~\ref{sec:validation}), the regulatory
+pathway toward FDA clearance (Section~\ref{sec:regulatory}), the
+limitations and open questions (Section~\ref{sec:limitations}), and the
+development roadmap (Section~\ref{sec:roadmap}).
+
+It is written for three audiences: clinical collaborators evaluating
+the diagnostic claims, regulatory reviewers assessing the device
+pathway, and software engineers who may contribute to the
+implementation.
+
+\subsection{What this document is not}
+
+This is not a clinical validation study. It does not report prospective
+trial data, and it makes no claim of diagnostic accuracy against a gold
+standard. It is a design and rationale document. Validation is
+described as a strategy (Section~\ref{sec:validation}), not as a
+result.
+
+\subsection{What this application is not}
+
+NeuroCardia is not a replacement for standard ECG interpretation, and
+it is not a diagnostic device. Three specific exclusions are stated
+here because they shape every subsequent claim.
+
+\begin{itemize}
+\item \textbf{It does not diagnose.} It computes descriptive metrics
+from an ECG recording. It does not produce a diagnosis, does not
+recommend treatment, and does not triage patients. Every report
+produced by the application includes a disclaimer that the output is
+informational and requires review by a qualified clinician.
+\item \textbf{The CSI is a research feature.} The Cardiac
+Synchronization Index and its derived early warning signals are not
+validated diagnostics. They are documented in this paper and in the
+companion residual paper as record-level descriptors whose clinical
+significance is a subject of ongoing investigation. They are gated
+behind a settings flag and labeled as not-for-clinical-use.
+\item \textbf{It is not a real-time monitor.} The application analyzes
+completed ECG recordings loaded from files. It does not stream from a
+device, does not monitor continuously, and does not alarm. The
+phase-domain metric in particular requires the full recording to
+stabilize and is not a short-window detector.
+\end{itemize}
+
+These exclusions are deliberate and are not limitations of the current
+version. They define the intended use. A device that made any of these
+three claims would be a different device with a different regulatory
+pathway and a different validation burden.
+
+\section{Background}
+
+\subsection{Heart rate variability}
+
+HRV analysis quantifies beat-to-beat variations in the RR interval
+series. Standard metrics include time-domain measures such as the root
+mean square of successive differences (RMSSD), the standard deviation
+of normal-to-normal intervals (SDNN), and the proportion of successive
+differences greater than 50 ms (pNN50); and frequency-domain measures
+such as low-frequency power (LF, 0.04--0.15 Hz), high-frequency power
+(HF, 0.15--0.40 Hz), and the LF/HF ratio~\cite{taskforce1996}.
+
+These metrics are descriptive: they characterize the state of the
+autonomic nervous system at a moment in time. They do not, by
+themselves, describe how that state is evolving, and they do not
+surface the dynamical signatures of impending transitions.
+
+\subsection{Cardiac rhythm as a coupled oscillator system}
+
+The sinoatrial node is a population of coupled pacemaker cells whose
+collective firing produces the cardiac rhythm. This is mathematically a
+system of coupled phase oscillators, and it is naturally described by
+the Kuramoto model~\cite{kuramoto1975,acebron2005}:
+\begin{equation}
+\frac{d\theta_i}{dt} = \omega_i + \frac{K}{N}\sum_{j=1}^{N}
+\sin(\theta_j - \theta_i),
+\label{eq:kuramoto}
+\end{equation}
+where $\theta_i$ is the phase of oscillator $i$, $\omega_i$ its natural
+frequency, $K$ the coupling strength, and $N$ the number of
+oscillators. The degree of synchronization is captured by the order
+parameter:
+\begin{equation}
+r = \left| \frac{1}{N} \sum_{j=1}^{N} e^{i\theta_j} \right|,
+\label{eq:orderparam}
+\end{equation}
+with $r \to 1$ indicating full phase locking and $r \to 0$ indicating
+incoherence.
+
+\subsection{Prior work on phase analysis of cardiac rhythm}
+
+Phase synchronization indices applied to ECG have been shown to
+outperform correlation, coherence, and mutual information for detecting
+rotors during atrial fibrillation. Early warning signals derived from
+Kuramoto-type models have been demonstrated to detect impending
+transitions to fibrillation in computational studies. What is missing
+is an integrated, open-source, on-device implementation.
+
+\section{Computational Model}\label{sec:model}
+
+\subsection{RR-to-phase mapping}
+
+Given an RR interval series $\{R_k\}_{k=1}^{M}$ (in seconds), we
+construct a phase trajectory by cumulative integration:
+\begin{equation}
+\phi_k = 2\pi \sum_{j=1}^{k} \frac{\overline{R}}{R_j} \pmod{2\pi},
+\label{eq:rrphase}
+\end{equation}
+where $\overline{R}$ is the mean RR interval. Each beat advances the
+phase by $2\pi \overline{R}/R_j$, so a beat at the mean rate advances
+exactly $2\pi$. This maps the irregular cardiac rhythm onto a unit
+circle and preserves the relative timing of each beat.
+
+\subsection{Network construction}
+
+We instantiate a Kuramoto network of $N = 16$ oscillators. Natural
+frequencies are assigned deterministically from the non-trivial
+Riemann zeros $\gamma_i$, then normalized to zero mean and unit
+variance:
+\begin{equation}
+\omega_i = \frac{\gamma_i - \bar\gamma}{\sigma_\gamma},
+\label{eq:freqnorm}
+\end{equation}
+where $\bar\gamma$ and $\sigma_\gamma$ are the mean and standard
+deviation of the first 16 Riemann zeros. The normalization is required
+for numerical tractability: the reference parameterization places the
+carrier at $\Omega_T = 587{,}000$ rad/s, five orders of magnitude above
+any frequency the Euler integrator can resolve at a practical time
+step.
+
+The frequency distribution is a specific modeling choice. Section~5.4
+reports the sensitivity of the diagnostic to this choice. The full
+sensitivity analysis is in the companion document~\cite{simoes2026sensitivity}.
+
+The coupling strength is $K = 2$. This value is not arbitrary: as
+shown in Section~5.4, the CSI at $K = 2$ carries incremental diagnostic
+information over conventional HRV, while at higher coupling strengths
+the network saturates and the metric becomes a monotone function of RR
+variability.
+
+\subsection{Phase reset from beats}
+
+At each detected R-peak, we reset the phase of a dedicated heart
+oscillator (index 0) to the cumulative phase $\phi_k$ from
+Equation~\ref{eq:rrphase}. The remaining $N-1$ oscillators evolve under
+Equation~\ref{eq:kuramoto}. This reset is what couples the model to
+the actual cardiac signal.
+
+\subsection{Coupling topologies}
+
+Four coupling topologies are supported, selectable from a settings
+menu: all-to-all (default), nearest-neighbor, small-world, and star.
+The topology is a modeling choice, not a diagnostic one.
+
+\subsection{Order parameter trajectory}
+
+We integrate the network with a fixed step $\Delta t = 0.05$ s and
+record the order parameter $r$ at each step. The result is a time
+series $r(t)$ that we term the Cardiac Synchronization Index (CSI).
+
+\section{Diagnostic Metrics}\label{sec:metrics}
+
+\subsection{Cardiac synchronization index}
+
+The CSI $r(t)$ is the primary novel output. It is bounded in $[0,1]$ by
+construction. In the production configuration ($K = 2$), the mean value
+across the reference corpora falls in the range 0.60--0.70; at higher
+coupling strengths the metric saturates and sits at 0.98--0.99 for all
+rhythms. The interpretation of specific CSI values is therefore not
+fixed across parameterizations, and the metric should be read as a
+relative quantity within a fixed parameterization, not as an absolute
+one.
+
+The trajectory of $r(t)$ --- its derivative, variance, and higher
+moments --- is as diagnostic as its instantaneous value. The app
+reports both the instantaneous value and the trajectory statistics.
+
+The CSI is a parameterized quantity. Its value depends on the frequency
+distribution of the oscillator network, the coupling strength $K$, and
+the number of oscillators $N$. It is not a universal invariant of
+cardiac phase synchronization.
+
+\subsection{Early warning signals}
+
+At bifurcation points in the Kuramoto model, the statistical moments of
+the order parameter change predictably. We compute four EWS metrics
+over a sliding window: variance, lag-1 autocorrelation, skewness, and
+kurtosis. These metrics are displayed as a composite risk strip below
+the main CSI plot, flagging potential transitions before they manifest
+as overt arrhythmias. The EWS metrics are exploratory; their prognostic
+value has not been prospectively validated.
+
+\subsection{Respiratory sinus arrhythmia and vagal coherence}
+
+We extract a respiration proxy from ECG baseline wander in the
+0.1--0.4 Hz band, then compute coherence between RSA and the
+high-frequency component of the RR spectrum. This is the vagal-cardiac
+coherence index. It is a proxy for the brain-heart axis derived from
+single-lead ECG alone.
+
+\subsection{Apnea screening via coherence band tracking}
+
+Following the reported literature on heart-respiration coherence in
+sleep apnea, we track the coherence peak in the 0.2--0.3 Hz band over
+time. A vanishing peak is associated with apneic episodes. We report a
+per-window apnea likelihood score. This is explicitly a screening aid,
+not a diagnosis.
+
+\subsection{Signal quality and runtime verification}
+
+Every metric in this section is only as trustworthy as the signal from
+which it was derived. NeuroCardia therefore computes a signal quality
+assessment on the raw input, at load time, before any detection or
+analysis runs. Four independent sub-metrics are computed:
+
+\begin{enumerate}
+\item Signal-to-noise ratio (SNR). The ratio of energy in the QRS band
+(5--15 Hz) to energy in the high-frequency noise band (40--100 Hz).
+Reported in decibels.
+\item Flatline fraction. The proportion of successive sample pairs whose
+absolute difference is below an epsilon.
+\item Clipping fraction. The proportion of samples at the observed
+extremes of the recording.
+\item Baseline wander fraction. The ratio of energy below 0.5 Hz to
+total energy.
+\end{enumerate}
+
+These four are combined into a composite score in $[0, 1]$. Hard floors
+apply: if the flatline fraction exceeds 0.9, or the baseline wander
+fraction exceeds 0.7, or the SNR is below 0 dB, the composite score is
+capped regardless of the other terms. The score maps to a verdict:
+GOOD $\geq 0.75 >$ FAIR $\geq 0.50 >$ POOR. The verdict is displayed
+in the analyzer screen and included in every report.
+
+This is a runtime verification mechanism, not a validation claim. It
+asserts that the input from which the metric was derived meets a
+minimum quality threshold, not that the metric is correct.
+
+\section{Validation Strategy}\label{sec:validation}
+
+\subsection{Reference datasets}
+
+To establish analytical validity before clinical trials, NeuroCardia is
+tested against three gold-standard annotated corpora from PhysioNet:
+
+\begin{itemize}
+\item \textbf{MIT-BIH Arrhythmia Database}~\cite{mitdb}. 48 half-hour
+records of ambulatory ECG, annotated beat-by-beat by cardiologists.
+\item \textbf{Fantasia Database}. 40 young and elderly healthy subjects
+with rigorously screened 2-hour records.
+\item \textbf{European ST-T Database}. 90 two-hour recordings focused on
+ST and T-wave changes.
+\end{itemize}
+
+\subsection{Validation pipeline}
+
+Validation runs as an automated test harness in the CI/CD pipeline. For
+every commit: records from the benchmark corpora are streamed through
+the app's Kotlin data ingestion pipeline; R-peak annotations produced
+by the Pan-Tompkins module are compared against reference
+\texttt{.atr} annotation files using a 150 ms match window; the
+Kuramoto engine computes $r(t)$ for each record; and summary statistics
+are exported to CSV and verified against reference golden outputs.
+
+\subsection{Acceptance criteria}
+
+Each validation test has an explicit numeric target. The targets below
+are the commitments made in this white paper.
+
+\begin{table}[h]
+\centering
+\small
+\begin{tabular}{lll}
+\toprule
+Metric & Dataset & Target \\
+\midrule
+R-peak sensitivity & MIT-BIH & $\geq 99.0\%$ \\
+R-peak PPV & MIT-BIH & $\geq 99.0\%$ \\
+HRV (RMSSD) agreement & Fantasia & within $5\%$ \\
+HRV (SDNN) agreement & Fantasia & within $5\%$ \\
+CSI discriminative validity ($K = 2$) & NSR/AF pilot & AUC $\geq 0.85$ \\
+Residual orthogonality & NSR/AF pilot & AUC $\geq 0.65$ after HRV removal \\
+EWS prognostic validity & MIT-BIH AF transitions & AUC $\geq 0.70$ \\
+Signal quality screen & All datasets & score $\geq 0.5$ \\
+\bottomrule
+\end{tabular}
+\caption{Acceptance criteria. All targets are met by the current
+implementation with the exception of the EWS prognostic criterion,
+which is exploratory and has not yet been tested on a corpus with
+annotated transitions.}
+\end{table}
+
+The residual orthogonality criterion is new in revision 0.2. It asks
+whether the Kuramoto residual retains diagnostic value after
+regressing out the two standard HRV features it is most correlated
+with. The current implementation meets the criterion (AUC 0.716 at
+$n = 18$), but the margin is narrow and the sample size small.
+
+\subsection{Empirical results}
+
+The CSI depends on two parameters that are not determined by cardiac
+physiology: the frequency distribution of the oscillator network, and
+the coupling strength $K$. To characterize this dependence and to test
+whether the CSI carries information beyond conventional HRV, we ran a
+series of experiments against two reference corpora: the MIT-BIH
+Arrhythmia Database (48 records, mixed rhythms) for the parameter
+sensitivity analysis, and a paired sample of MIT-BIH Normal Sinus
+Rhythm (9 records) and MIT-BIH Atrial Fibrillation (9 records) for the
+discriminative validity test.
+
+\subsubsection{Sensitivity to the frequency distribution}
+
+Five frequency distributions were tested: Riemann zeros (Arm A, the
+production configuration), uniform random (Arm B), Gaussian (Arm C),
+physiological scale (Arm D), and linear spacing (Arm E). Table~\ref{tab:trajectory-wp}
+reports the mean Pearson correlation between Arm A's trajectory and
+each alternative arm's trajectory.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{r|cccc}
+\toprule
+$K$ & Arm B & Arm C & Arm D & Arm E \\
+\midrule
+2.0 & $0.052$ & $0.076$ & $0.051$ & $0.168$ \\
+5.0 & $0.250$ & $0.230$ & $0.250$ & $0.611$ \\
+10.0 & $0.386$ & $0.366$ & $0.386$ & $0.778$ \\
+30.0 & $0.458$ & $0.428$ & $0.458$ & $\mathbf{0.869}$ \\
+100.0 & $-0.000$ & $0.000$ & $0.001$ & $0.001$ \\
+\bottomrule
+\end{tabular}
+\caption{Mean Pearson correlation between the CSI trajectory under Arm
+A and under each alternative arm, across 48 mitdb records. The
+pre-registered threshold of $0.80$ is met only by Arm E at $K = 30$,
+where the network is saturated.}
+\label{tab:trajectory-wp}
+\end{table}
+
+The CSI trajectory is not robust to the frequency distribution at any
+coupling strength where the metric has dynamic range. The companion
+sensitivity analysis reports the full result.
+
+\subsubsection{Sensitivity to coupling strength}
+
+The coupling strength was swept over $K \in \{0.5, 1, 2, 3, 4, 5, 10\}$.
+The residual diagnostic peaks at $K = 2$ (AUC 0.89), inverts below
+$K = 1$ (AUC 0.17--0.21), and decays to noise above $K = 3$
+(AUC 0.59--0.72). The useful window is narrow.
+
+\subsubsection{Correlation with conventional HRV}
+
+At $K = 10$, the mean CSI correlates with the coefficient of variation
+of the RR interval series at $\rho = -0.95$, with SDNN at
+$\rho = -0.87$, and with the Poincar\'e SD2 at $\rho = -0.86$. The CSI
+is essentially a monotone function of RR variability at this
+parameterization.
+
+At $K = 2$, the CSI is not a monotone function of RR variability, and
+the residual (the component orthogonal to RR variability) separates
+sinus from AF.
+
+\subsubsection{Residual analysis}
+
+We regressed CSI mean against RR coefficient of variation by ordinary
+least squares and analyzed the residuals. Table~\ref{tab:residual-wp}
+reports the residual AUC at $K = 2$ for each of the five frequency
+distributions.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{llrr}
+\toprule
+Arm & Distribution & Residual AUC & $p$ \\
+\midrule
+A & Riemann zeros & $0.889$ & $0.002$ \\
+B & Uniform random & $0.543$ & $0.986$ \\
+C & Gaussian & $0.852$ & $0.007$ \\
+D & Physiological scale & $0.556$ & $0.982$ \\
+E & Linear spacing & $0.840$ & $0.010$ \\
+\bottomrule
+\end{tabular}
+\caption{Residual AUC at $K = 2$ for each frequency distribution, on
+the paired sinus/AF pilot corpus. Three arms exhibit the residual; two
+do not.}
+\label{tab:residual-wp}
+\end{table}
+
+The residual is diagnostic for three of five tested distributions.
+Revision 0.1 of this white paper reported only the three working arms
+and described the result as robust across the frequency distribution;
+the full five-arm test shows that this claim is narrower than
+reported.
+
+\subsubsection{Orthogonality of the residual to standard HRV}
+
+To test whether the residual carries information beyond standard HRV,
+we regressed it on the two features it is most correlated with in the
+pilot corpus (the Poincar\'e SD1/SD2 ratio and the coefficient of
+variation of the RR series) and computed the AUC of the
+orthogonalized residual. The raw residual separates sinus from AF with
+AUC 0.889; the orthogonalized residual separates them with AUC 0.716.
+Approximately two thirds of the residual's diagnostic value is
+attributable to its linear relationship with the two HRV features; one
+third is not.
+
+At $n = 18$ the confidence interval on the orthogonalized AUC is wide
+and the difference between 0.889 and 0.716 is not statistically
+significant at this sample size. The finding is suggestive, not
+conclusive.
+
+\subsubsection{Mechanism}
+
+In the AF cohort, 94\% of the residual's \emph{between-record} variance
+is explained by three P-wave features extracted from the raw ECG
+(P-wave energy, PR-interval variability, and fibrillatory amplitude),
+features the Kuramoto engine does not have access to. In the sinus
+cohort, 37\% is explained. The residual is best understood as a
+between-record discriminator, not a within-record state tracker: the
+window-to-window variation of the residual within a single record does
+not correlate with the same features (mean $|r| < 0.15$ in both
+cohorts), and the window-level AUC plateaus at 0.66--0.68 across
+1--5 minute windows (0.50 at 30~s). Whole-record averaging is required
+to recover the discriminative signal. Two thirds of the residual's
+record-level diagnostic value is redundant with standard HRV.
+
+\subsubsection{Interpretation}
+
+Three conclusions follow.
+
+First, the CSI at $K = 2$ carries information about cardiac rhythm that
+is not captured by conventional HRV. After regressing out the linear
+dependence on RR variability, the residual separates normal sinus
+rhythm from atrial fibrillation with an AUC of 0.89 on the pilot
+corpus. After regressing out both RR variability and the Poincar\'e
+SD1/SD2 ratio, the residual retains an AUC of 0.716.
+
+Second, the metric's behavior depends critically on the coupling
+strength. The same metric at $K = 10$ is redundant with conventional
+HRV, with no residual diagnostic information. Above $K = 3$ the network
+saturates; below $K = 1$ the sign of the residual correlation inverts.
+The useful regime is narrow.
+
+Third, the residual is not distribution-agnostic. It is exhibited by
+three of five tested frequency distributions. The choice of distribution
+matters.
+
+\subsection{Reproducibility}
+
+All validation code and expected outputs are committed to the
+repository under \texttt{validation/}. Every metric is reproducible
+with a single Gradle command on any JVM:
+\begin{verbatim}
+./gradlew :validation:run --args="<mode> <args>"
+\end{verbatim}
+The output is deterministic given the same input and the same build.
+Builds are signed, and the signed APK hash is published with every
+release.
+
+\section{Regulatory Pathway (FDA 510(k))}\label{sec:regulatory}
+
+\subsection{Intended use and device classification}
+
+NeuroCardia is intended to be used as a software-as-a-medical-device
+(SaMD) decision-support tool. It processes single-lead ECG data to
+compute heart rate variability metrics and phase-domain synchronization
+indices. It is intended for use by healthcare professionals and trained
+investigators in research and clinical settings. It does not provide an
+automated diagnosis, does not direct clinical treatment, and is not
+intended as a replacement for standard ECG interpretation.
+
+Under FDA product classification, ECG analysis software of this type
+falls under product code DQK (electrocardiograph software) or MWJ
+(system, network, and patient monitoring), typically regulated as
+Class II medical devices requiring 510(k) clearance.
+
+\subsection{Predicate device selection}
+
+The primary predicate device for 510(k) clearance will be an
+established commercial ECG analysis software package with cleared
+indications for automated HRV analysis and arrhythmia detection from
+ambulatory ECG recordings.
+
+\subsection{Substantial equivalence argument}
+
+NeuroCardia is substantially equivalent in intended use and fundamental
+technological characteristics to predicate devices. The technological
+difference --- the introduction of the Kuramoto coupled-oscillator
+model and the derived CSI $r(t)$ --- represents a new feature for a
+cleared SaMD. Under FDA guidance, new analytical methods in an existing
+device category are addressed through analytical validation and
+non-clinical performance testing, without necessarily requiring a
+De Novo pathway, provided the device does not make novel diagnostic
+claims that alter its risk profile.
+
+\subsection{FDA classification strategy}
+
+We plan a 510(k) premarket notification pathway. The claims made in the
+initial submission are: R-peak detection and heart rate computation;
+HRV metrics (time and frequency domain); rhythm irregularity flagging;
+and report export (PDF) suitable for clinical documentation.
+
+Claims that require additional validation before regulatory submission:
+cardiac synchronization index as a diagnostic; early warning signal
+detection; apnea screening; vagal-cardiac coherence index; and residual
+orthogonality to standard HRV.
+
+These are initially released as research features, gated behind a
+settings flag, and documented as not-for-clinical-use. A subsequent
+510(k) or De Novo submission will cover them once validation is
+complete.
+
+\subsection{Software lifecycle and quality management}
+
+To comply with FDA expectations for SaMD (and IEC 62304 standard for
+medical device software lifecycle processes), development adheres to
+version control and reproducibility (every release is tagged,
+cryptographically hashed, and tied to a Software Bill of Materials in
+CycloneDX format); traceability (requirements are mapped to unit tests
+and integration tests); risk management (ISO 14971; identified hazards
+such as false R-peak classification are mitigated through signal
+quality checks, confidence scoring, and mandatory clinician review
+disclaimers); and quality management (ISO 13485-aligned QMS before any
+clinical claim).
+
+\section{Limitations and Open Questions}\label{sec:limitations}
+
+\subsection{The Riemann-zero frequency distribution}
+
+The author does not claim that the Riemann zeros have a direct
+physiological correlate in cardiac electrophysiology. The choice is a
+specific choice documented in the companion mathematical reference.
+Whether this distribution offers diagnostic advantages over standard
+Gaussian or uniform frequency distributions is addressed empirically in
+Section~5.4. The sensitivity analysis shows that the CSI trajectory is
+not invariant to the choice of frequency distribution at any tested
+coupling strength, and that the residual diagnostic is exhibited by
+three of five tested distributions.
+
+\subsection{Carrier scale and phase velocity}
+
+The reference parameterization places the carrier frequency at
+$\Omega_T = 587{,}000$ rad/s, five orders of magnitude above the cardiac
+rhythm. The absolute scale of the carrier does not affect the
+dimensionless order parameter $r(t)$, but it has a decisive effect on
+numerical integration. We work with normalized frequencies, in which
+the carrier is subtracted and the residual Riemann-zero distribution is
+scaled to unit variance.
+
+\subsection{Signal quality and artifact sensitivity}
+
+Like all HRV and phase-domain tools, NeuroCardia is sensitive to motion
+artifact, electrode displacement, and ectopic beats. While the
+Pan-Tompkins detector includes amplitude and slope filtering, severe
+baseline wander or frequent premature ventricular contractions can
+distort the RR tachogram.
+
+\subsection{Choice of $N = 16$}
+
+The number of oscillators is a free parameter. We adopt $N = 16$ to
+match the reference implementation. The sensitivity of the CSI to $N$
+is a planned study.
+
+\subsection{Single-lead constraints}
+
+The absence of a spatial map of the atrium limits rotor detection to a
+temporal analysis. A multi-lead device would allow spatial mapping.
+That is a different device with a different intended use.
+
+\subsection{Residual orthogonality}
+
+The orthogonality result (AUC 0.716 at $n = 18$) has a wide confidence
+interval. Full-corpus replication on the complete NSRDB and AFDB is
+required before the residual can be claimed as a validated
+discriminative feature.
+
+\subsection{Validation is ongoing}
+
+At the time of writing, the novel metrics are supported by literature
+and by internal consistency checks, but not by prospective clinical
+validation. This document will be revised as validation results become
+available. Readers should treat every claim in Section~\ref{sec:metrics}
+as a hypothesis under test, not as an established result.
+
+\section{Roadmap and Future Work}\label{sec:roadmap}
+
+Development milestones for NeuroCardia are structured across five
+version releases:
+
+\begin{itemize}
+\item \textbf{v0.1 (Current).} Core Android app, Pan-Tompkins R-peak
+detector, basic time-domain HRV, Kuramoto engine with $N = 16$ and
+Riemann zero frequencies, CSV (RR intervals) and PDF report export,
+GPL-3.0 open-source release.
+\item \textbf{v0.2.} EWS metrics (variance, autocorrelation), CSV
+exports for metrics and annotated signals, JSON audit log and SHA-256
+manifest generation.
+\item \textbf{v0.3.} Single-file HTML reports, session bundle JSON
+schema (v1), automated SBOM generation.
+\item \textbf{v0.4.} Full $r(t)$ CSI trajectory export, advanced
+coupling topology selectors, companion UI plots.
+\item \textbf{v0.5.} WFDB (.dat + .hea + .atr) and EDF+ export support
+for direct interoperability with PhysioNet and clinical workstations.
+\end{itemize}
+
+\section{Conclusion}
+
+NeuroCardia is an open-source Android application for offline,
+on-device analysis of single-lead ECG recordings. It runs entirely on
+the handset, with no network dependency, no user accounts, and no
+telemetry. It computes conventional HRV metrics, a four-axis signal
+quality score, and a phase-domain Cardiac Synchronization Index derived
+from a Kuramoto coupled-oscillator network. Its DSP and I/O layers are
+packaged as standalone Kotlin/JVM modules that can be reused in any JVM
+project.
+
+The application's primary contribution is the deployment envelope:
+open-source, offline, on-device ECG analysis on commodity Android
+hardware, with a regulatory strategy that treats the conventional HRV
+metrics as validated outputs and the phase-domain metric as a research
+feature with a documented plan for further validation. The
+phase-domain metric itself is a record-level nonlinear summary of the
+RR series with partial novelty over standard HRV (approximately one
+third of its diagnostic value is not explained by the two HRV features
+it is most correlated with) and with specific, quantified limitations
+(three of five tested frequency distributions; record-level but not
+window-level discrimination). These properties are documented in the
+companion residual paper.
+
+The version 0.1 white paper is revised here as version 0.2. The
+principal changes are a reframing of the application's contribution
+around the deployment envelope rather than the novel metric, the
+addition of an explicit "what this application is not" section, and
+the scoping of the phase-domain claims to their empirically
+demonstrated range. The regulatory strategy is unchanged.
+
+\begin{thebibliography}{9}
+
+\bibitem{taskforce1996}
+Task Force of the European Society of Cardiology and the North American
+Society of Pacing and Electrophysiology. Heart rate variability:
+standards of measurement, physiological interpretation, and clinical
+use. \emph{Circulation}, 93(5):1043--1065, 1996.
+
+\bibitem{kuramoto1975}
+Y.~Kuramoto. Self-entrainment of a population of coupled non-linear
+oscillators. In \emph{International Symposium on Mathematical Problems
+in Theoretical Physics}, pages 420--422. Springer, 1975.
+
+\bibitem{acebron2005}
+J.~A.~Acebr\'on, L.~L.~Bonilla, C.~J.~P\'erez Vicente, F.~Ritort, and
+R.~Spigler. The Kuramoto model: A simple paradigm for synchronization
+phenomena. \emph{Reviews of Modern Physics}, 77(1):137--185, 2005.
+
+\bibitem{pan1985}
+J.~Pan and W.~J.~Tompkins. A real-time QRS detection algorithm.
+\emph{IEEE Transactions on Biomedical Engineering},
+BME-32(3):230--236, 1985.
+
+\bibitem{mitdb}
+G.~B.~Moody and R.~G.~Mark. The impact of the MIT-BIH Arrhythmia
+Database. \emph{IEEE Engineering in Medicine and Biology Magazine},
+20(3):45--50, 2001.
+
+\bibitem{nsrdb}
+R.~G.~Mark and G.~B.~Moody. MIT-BIH Normal Sinus Rhythm Database.
+PhysioNet, 1990. \url{https://physionet.org/content/nsrdb/}.
+
+\bibitem{afdb}
+G.~B.~Moody and R.~G.~Mark. MIT-BIH Atrial Fibrillation Database.
+PhysioNet, 1983. \url{https://physionet.org/content/afdb/}.
+
+\bibitem{scheffer2009}
+M.~Scheffer et al. Early-warning signals for critical transitions.
+\emph{Nature}, 461(7260):53--59, 2009.
+
+\bibitem{simoes2026engine}
+A.~Simoes. The Kuramoto Engine: Physics and Mathematics of the Cardiac
+Synchronization Index. Technical reference, revision 0.2, 2026.
+Companion document.
+
+\bibitem{simoes2026sensitivity}
+A.~Simoes. Sensitivity Analysis Protocol: Validation Methodology for
+the Kuramoto Phase Engine in NeuroCardia. Protocol, revision 0.2,
+2026. Companion document.
+
+\bibitem{simoes2026residual}
+A.~Simoes. The Kuramoto Residual: Phase-Domain Information in the
+Cardiac Rhythm Beyond Heart Rate Variability. Research paper, revision
+0.2, 2026. Companion document.
+
+\end{thebibliography}
+
+\end{document}

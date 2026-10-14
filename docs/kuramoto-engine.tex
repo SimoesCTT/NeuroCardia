@@ -1,0 +1,681 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage[hidelinks]{hyperref}
+\usepackage{times}
+
+\title{\textbf{The Kuramoto Engine}\\[4pt]
+\large Physics and Mathematics of the Cardiac Synchronization Index\\[2pt]
+\normalsize Technical reference for the NEUROCARDIA application\\[2pt]
+\small Version 0.2 --- Revision}
+\author{Americo Simoes \\ \texttt{amexsimoes@gmail.com}}
+\date{October 14, 2026}
+
+\begin{document}
+\maketitle
+
+\begin{center}
+\small
+Copyright \textcopyright{} 2026 Americo Simoes. All rights reserved.\\
+This document is released under the Creative Commons Attribution 4.0
+International License (CC-BY-4.0). The software it describes is released
+under the GNU General Public License, version 3 or later (GPL-3.0-or-later).
+\end{center}
+
+\vspace{1em}
+\noindent\fbox{\parbox{\dimexpr\linewidth-2\fboxsep-2\fboxrule}{%
+\textbf{Revision history.} This is revision 0.2 of \emph{The Kuramoto
+Engine}. Revision 0.1 (October 14, 2026) specified the model, the
+numerical scheme, and the parameter choices, and stated $K = 2$ as an
+empirical choice. Revision 0.2 adds the result of the coupling-strength
+sweep: $K = 2$ is not merely the value that produces a diagnostic
+residual, it is the only value in the tested range where the residual
+carries information at all. The revision also notes that the trajectory
+of the order parameter is not robust to the frequency distribution at
+any value of $K$ where the metric has dynamic range. The mathematical
+treatment of the model is unchanged.}}
+
+\vspace{1em}
+
+\begin{abstract}
+This document specifies the mathematical model, the numerical methods,
+and the parameter choices underlying the Cardiac Synchronization Index
+(CSI) computed by the NEUROCARDIA application. The CSI is the order
+parameter of a Kuramoto coupled-oscillator network driven by the RR
+interval series of a single-lead ECG recording. We present the model,
+the discretization scheme, the treatment of the natural frequency
+distribution, the phase-reset mechanism, and the derivation of the four
+early warning signal metrics that accompany the CSI. Section~4.3 reports
+the coupling-strength sweep and the narrow window in which the metric is
+diagnostic. Section~4.2 discusses the sensitivity of the trajectory to
+the frequency distribution. The document is self-contained: it assumes
+no prior familiarity with the Kuramoto model.
+\end{abstract}
+
+\tableofcontents
+
+\section{Introduction}
+
+The Kuramoto model is the canonical mathematical description of
+synchronization in a population of coupled phase oscillators. It was
+introduced by Yoshiki Kuramoto in 1975~\cite{kuramoto1975} as a minimal
+model of collective behavior, and it has since been applied across
+physics, biology, and neuroscience~\cite{acebron2005,strogatz2000}. The
+appeal of the model is that it captures the essential phenomenon ---
+oscillators settling into or falling out of phase lock --- without
+requiring detailed specification of the underlying dynamics.
+
+This document describes one specific application of the Kuramoto model:
+the analysis of cardiac rhythm from the RR interval series of a
+single-lead ECG. The sinoatrial node is a population of coupled
+pacemaker cells whose collective firing produces the cardiac rhythm.
+Treating the RR tachogram as a phase signal and applying the Kuramoto
+model to it yields a time-varying order parameter that we call the
+Cardiac Synchronization Index (CSI). The CSI is a measure of how
+regularly the heart is beating, expressed in the phase domain rather
+than the time or frequency domain.
+
+The document is organized as follows. Section~\ref{sec:model} presents
+the Kuramoto model and the order parameter. Section~\ref{sec:rrphase}
+describes the RR-to-phase mapping that connects the model to the ECG
+signal. Section~\ref{sec:network} specifies the network parameters,
+including the frequency distribution and the coupling strength.
+Section~\ref{sec:integration} presents the numerical integration scheme.
+Section~\ref{sec:ews} derives the early warning signal metrics.
+Section~\ref{sec:properties} discusses mathematical properties of the
+model. Section~\ref{sec:limitations} identifies the model's limitations.
+
+\section{The Kuramoto Model}\label{sec:model}
+
+\subsection{The phase oscillator}
+
+Consider a system of $N$ coupled oscillators. Each oscillator $i$ is
+described by a single scalar, its phase $\theta_i \in \mathbb{R}/2\pi\mathbb{Z}$.
+The phase advances monotonically in time; the rate of advance is the
+oscillator's instantaneous frequency. When the oscillator is isolated,
+the rate is a constant called the natural frequency $\omega_i$.
+
+The choice to describe an oscillator by its phase rather than by a full
+state vector is a deliberate simplification. It is justified when the
+oscillator's amplitude is either fixed or irrelevant to the question
+being asked, and when the only observable of interest is timing. For
+coupled pacemaker cells driving a cardiac rhythm, both conditions hold:
+the observable that matters is when the next beat occurs, not the
+detailed ionic dynamics that produced it.
+
+\subsection{The coupling}
+
+When two oscillators are coupled, each one's instantaneous frequency is
+perturbed by the phase of the other. A natural form for this
+perturbation is the sine of the phase difference. This choice has three
+properties that make it the canonical one:
+
+\begin{enumerate}
+\item \emph{Antisymmetry.} If oscillator $j$ advances the phase of
+oscillator $i$ by $\sin(\theta_j - \theta_i)$, then $i$ advances $j$ by
+$\sin(\theta_i - \theta_j) = -\sin(\theta_j - \theta_i)$, the exact
+opposite. The two oscillators influence each other equally and
+oppositely. No energy is created or destroyed by the coupling.
+\item \emph{Smoothness.} The sine is infinitely differentiable and
+bounded. It cannot produce abrupt jumps in frequency.
+\item \emph{$2\pi$-periodicity.} The coupling depends only on the phase
+difference modulo $2\pi$. Two oscillators at phase difference $0.1$ and
+at phase difference $0.1 + 2\pi$ are coupled identically.
+\end{enumerate}
+
+More general coupling functions are possible and are studied in the
+literature. The sine coupling is the simplest that satisfies the
+requirements above, and it is the form used here.
+
+\subsection{The governing equation}
+
+The Kuramoto model is the system of $N$ coupled differential equations
+\begin{equation}
+\frac{d\theta_i}{dt} = \omega_i + \frac{K}{N}\sum_{j=1}^{N}
+\sin(\theta_j - \theta_i), \quad i = 1, \ldots, N,
+\label{eq:kuramoto}
+\end{equation}
+where $K \geq 0$ is the coupling strength. The factor $1/N$ normalizes
+the sum so that the total influence on oscillator $i$ does not grow
+without bound as $N$ increases. With this normalization, the coupling
+term is the average of the sine of the phase differences between $i$
+and every other oscillator.
+
+The equation has a clear physical reading. The phase of oscillator $i$
+advances at its natural frequency $\omega_i$, plus a correction from
+the coupling. If $i$ is lagging behind the population on average, the
+sum of sines is positive and $i$ speeds up. If $i$ is leading, the sum
+is negative and $i$ slows down. The coupling pulls oscillators toward
+each other.
+
+\subsection{The order parameter}
+
+The degree to which the population is synchronized is quantified by the
+order parameter
+\begin{equation}
+r = \left| \frac{1}{N} \sum_{j=1}^{N} e^{i\theta_j} \right|,
+\label{eq:orderparam}
+\end{equation}
+where $e^{i\theta_j}$ is the point on the unit circle corresponding to
+phase $\theta_j$. The order parameter has a direct geometric
+interpretation: it is the magnitude of the mean of $N$ unit vectors,
+each pointing at the phase of one oscillator.
+
+If all oscillators have the same phase, the mean of their unit vectors
+is a unit vector, and $r = 1$. If the phases are uniformly distributed
+around the circle, the unit vectors sum to zero, and $r = 0$. For a
+finite population of $N$ oscillators with uniformly random phases, the
+expected value of $r$ is $1/\sqrt{N}$.
+
+The order parameter is bounded in $[0,1]$ and is invariant to a global
+phase shift: adding a constant to every $\theta_j$ does not change $r$.
+
+\subsection{The critical coupling}
+
+For a given distribution of natural frequencies $g(\omega)$, the
+Kuramoto model exhibits a phase transition at a critical coupling
+strength $K_c$. Below $K_c$, the oscillators drift incoherently and
+$r \to 0$ in the thermodynamic limit. Above $K_c$, a subset of
+oscillators locks to a common frequency and $r$ rises toward a positive
+value.
+
+For a symmetric, unimodal distribution $g(\omega)$, the critical
+coupling has the closed form
+\begin{equation}
+K_c = \frac{2}{\pi g(0)},
+\label{eq:critical}
+\end{equation}
+where $g(0)$ is the density of the frequency distribution at its
+center. Distributions with a sharper peak at zero have smaller $K_c$;
+distributions that are flatter at zero have larger $K_c$.
+
+This closed form does not apply to the frequency distribution used here
+(see Section~\ref{sec:network}), but the qualitative behavior holds:
+there is a threshold below which the network is incoherent and above
+which it synchronizes. The precise value of the threshold depends on
+the distribution.
+
+\section{RR-to-Phase Mapping}\label{sec:rrphase}
+
+The Kuramoto model describes the evolution of phases. The ECG does not
+measure phases directly. We construct a phase signal from the RR
+interval series as follows.
+
+Let $\{R_k\}_{k=1}^{M}$ be the intervals between successive detected
+R-peaks, in seconds. Let $\overline{R}$ be their mean. Define the
+cumulative phase at beat $k$ as
+\begin{equation}
+\phi_k = 2\pi \sum_{j=1}^{k} \frac{\overline{R}}{R_j} \pmod{2\pi}.
+\label{eq:rrphase}
+\end{equation}
+
+Each beat advances the cumulative phase by $2\pi \overline{R}/R_j$. A
+beat at the mean rate ($R_j = \overline{R}$) advances the phase by
+exactly $2\pi$, returning to the same point on the circle. A shorter
+interval advances the phase by more than $2\pi$; a longer interval
+advances it by less.
+
+The choice of $\overline{R}$ as the reference is deliberate. It makes
+the phase trajectory scale-invariant: a subject whose mean RR is 0.6
+seconds (100 BPM) and a subject whose mean RR is 1.2 seconds (50 BPM)
+produce comparable phase trajectories, both advancing by $2\pi$ per
+mean beat. The CSI measures synchronization, not rate. Rate is reported
+separately as heart rate in beats per minute.
+
+The cumulative phase is defined modulo $2\pi$. The natural choice is to
+wrap at the boundary of the unit circle, mapping every phase into
+$[0, 2\pi)$.
+
+\section{Network Construction}\label{sec:network}
+
+\subsection{Number of oscillators}
+
+The network has $N = 16$ oscillators. This is a modeling choice. The
+choice is not derived from cardiac physiology; it matches the dimension
+used in the reference implementation from which the parameterization
+was inherited. A principled choice --- for example, derived from the
+number of identifiable frequency components in the RR spectrum, or from
+the number of pacemaker cell clusters in the sinoatrial node --- would
+be preferable, and the sensitivity of the CSI to this choice is a
+subject for future work.
+
+The incoherent baseline for $N = 16$ is $1/\sqrt{16} = 0.25$. Any CSI
+value meaningfully above 0.25 indicates partial synchronization.
+
+\subsection{Natural frequency distribution}
+
+The natural frequencies $\omega_i$ are drawn from the non-trivial zeros
+$\gamma_i$ of the Riemann zeta function. The first 24 such zeros are
+tabulated in Table~\ref{tab:zeros}. For a network of $N = 16$
+oscillators, the first 16 zeros are used.
+
+\begin{table}[h]
+\centering
+\small
+\begin{tabular}{llllll}
+\toprule
+14.134725 & 21.022040 & 25.010858 & 30.424876 & 32.935062 & 37.586178 \\
+40.918719 & 48.005151 & 49.773832 & 52.970321 & 56.446248 & 59.347044 \\
+60.831779 & 65.112544 & 67.079811 & 69.546402 & 72.067158 & 75.704691 \\
+77.144840 & 79.337375 & 82.910381 & 84.735493 & 86.970000 & 87.425275 \\
+\bottomrule
+\end{tabular}
+\caption{The first 24 non-trivial Riemann zeros. Used as the raw
+frequencies of the network before normalization.}
+\label{tab:zeros}
+\end{table}
+
+The raw frequencies are then normalized:
+\begin{equation}
+\omega_i = \frac{\gamma_i - \bar\gamma}{\sigma_\gamma},
+\label{eq:normalization}
+\end{equation}
+where $\bar\gamma$ and $\sigma_\gamma$ are the mean and standard
+deviation of the first 16 Riemann zeros.
+
+Two points deserve emphasis.
+
+\begin{enumerate}
+\item The Riemann zeros are not claimed to have cardiac significance.
+They are a deterministic, fixed sequence with a mathematically
+determined distribution. Any other deterministic sequence with
+comparable spread would serve the same role. The choice reflects the
+reference implementation rather than a physiological argument.
+
+\item The normalization is required for numerical tractability.
+Section~\ref{sec:integration} discusses the integration scheme. The
+unnormalized frequencies span a range of order $10^2$, which would
+require an impractical step size for stable Euler integration. The
+normalized frequencies span a range of order 1, which the Euler scheme
+resolves at a tractable step.
+\end{enumerate}
+
+\paragraph{Sensitivity to the frequency distribution.}
+The trajectory of the order parameter depends on the choice of frequency
+distribution. A sensitivity analysis across five distributions
+(Riemann zeros, uniform random, Gaussian, physiological scale, and
+linear spacing) shows that the mean Pearson correlation between the CSI
+trajectory under the Riemann-zero configuration and under any
+alternative configuration is at most $0.17$ at $K = 2$, and reaches the
+pre-registered threshold of $0.80$ only for the linear-spacing
+distribution at $K = 30$, where the network is saturated. The absolute
+value of the CSI is therefore not robust to the frequency distribution
+at any coupling strength where the metric has dynamic range. The
+residual diagnostic (Section~\ref{sec:properties}) is partially robust,
+but not to the extent that revision 0.1 of the companion paper claimed.
+We defer the full analysis to the companion documents and note here only
+that the choice of frequency distribution is part of the definition of
+the CSI, not an incidental parameter.
+
+\subsection{Coupling strength}
+
+The coupling strength is set to $K = 2$. This value is chosen
+empirically rather than from the critical coupling formula, and it
+matters: the behavior of the metric depends critically on this choice.
+At $K = 2$ the network partially synchronizes after each R-peak reset
+without saturating, so the order parameter trajectory retains dynamic
+range. At $K \geq 5$ the network locks completely after each reset and
+the order parameter sits near $1.0$ for all input rhythms, destroying
+sensitivity. At $K \leq 1$ the network is under-coupled and the residual
+diagnostic information inverts in sign.
+
+The useful range is narrow and centered on $K = 2$. The companion
+sensitivity analysis and residual papers report the full coupling sweep.
+The quantitative summary is:
+
+\begin{itemize}
+\item \textbf{$K \leq 1$ (under-coupled).} The residual separates sinus
+from AF with opposite sign: AUC $0.17$ at $K = 0.5$ and $0.21$ at
+$K = 1.0$ (sign-inverted accuracies of $83\%$ and $79\%$). The network
+is too weakly coupled to reflect the phase perturbations from the RR
+series.
+\item \textbf{$K = 2$ (intermediate).} The residual separates sinus from
+AF with AUC $0.89$, $\rho = +0.68$, $p = 0.002$ on the pilot corpus.
+This is the useful regime.
+\item \textbf{$K \geq 3$ (saturated).} The residual AUC drops to
+$0.59$--$0.72$ and the metric becomes indistinguishable from noise.
+The network locks completely after each reset and stays locked until the
+next beat, so the order parameter does not respond to the RR series.
+\end{itemize}
+
+The choice of $K$ is part of the metric's definition, not a physical
+postulate about the sinoatrial node.
+
+\subsection{Coupling topology}
+
+The default coupling is all-to-all with weight $1/N$. This is the
+classical Kuramoto configuration. Every oscillator couples to every
+other with equal weight, and the topology reflects the assumption that
+the sinoatrial pacemaker cells are densely interconnected.
+
+Three alternative topologies are available in the implementation:
+
+\begin{itemize}
+\item \textbf{Nearest-neighbor.} Each oscillator couples to its two
+immediate neighbors. Produces traveling waves.
+\item \textbf{Small-world.} A ring with a small number of random
+long-range links. Balances local clustering with global connectivity.
+\item \textbf{Star.} One hub oscillator couples to all leaves.
+Concentrates synchronization through a single node.
+\end{itemize}
+
+The topology is a modeling choice. The default is all-to-all.
+
+\section{Numerical Integration}\label{sec:integration}
+
+\subsection{The Euler scheme}
+
+The Kuramoto equation~\eqref{eq:kuramoto} is a system of first-order
+ordinary differential equations with no closed-form solution for
+$N > 2$. We integrate numerically using the explicit Euler method:
+\begin{equation}
+\theta_i(t + \Delta t) = \theta_i(t) + \Delta t \cdot \left[
+\omega_i + \frac{K}{N} \sum_{j=1}^{N} \sin(\theta_j(t) - \theta_i(t))
+\right],
+\label{eq:euler}
+\end{equation}
+where $\Delta t$ is the integration step. The phases are updated
+simultaneously: the right-hand side is evaluated at the current time
+$t$ for all $i$, then all updates are applied.
+
+The choice of the Euler method is deliberate. Higher-order methods
+(Runge-Kutta, for instance) are more accurate per step, but the Euler
+method is stable for the step sizes used here and its behavior is easy
+to reason about. The accuracy of the trajectory is not the objective;
+the value of the order parameter is, and that quantity is robust to
+moderate integration error.
+
+\subsection{Step size}
+
+The step size must be small enough that the phase advance per step is
+much less than $2\pi$. Otherwise the sine evaluation aliases: the phase
+advances past one full rotation during a single step, and the update
+effectively samples a random point on the circle.
+
+With normalized frequencies of order 1 and coupling $K = 2$, the
+maximum instantaneous phase velocity is of order 2 rad/s. A step of
+$\Delta t = 0.05$ s advances the phase by up to 0.5 radians per step,
+well under the aliasing threshold.
+
+The step size is fixed at $0.05$ seconds. For a recording with mean RR
+interval $\overline{R}$, the number of integration steps per beat is
+\begin{equation}
+n_{\text{steps}} = \left\lfloor \frac{\overline{R}}{\Delta t} \right\rfloor,
+\label{eq:steps}
+\end{equation}
+clamped to the range $[1, 200]$. For a mean RR of $0.83$ seconds (72
+BPM), this gives 16 steps per beat.
+
+\subsection{Phase reset}
+
+At each detected R-peak, the phase of a designated heart oscillator
+(index 0) is reset to the cumulative phase $\phi_k$ defined in
+equation~\eqref{eq:rrphase}. The other $N-1$ oscillators are not reset;
+they continue their evolution from the current state.
+
+The reset is the mechanism by which the network is coupled to the
+cardiac signal. Without it, the network would evolve as a free-running
+oscillator system with no relationship to the subject's rhythm. With
+it, each beat injects a phase impulse into the network, and the
+network's response --- how it re-synchronizes, how quickly, and with
+what characteristic fluctuations --- is the diagnostic signal.
+
+\subsection{Sampling the order parameter}
+
+After each integration step, the order parameter $r$ is evaluated using
+equation~\eqref{eq:orderparam} and appended to a trajectory. For a
+recording with $M$ beats, the trajectory has approximately
+$M \cdot n_{\text{steps}}$ samples.
+
+The CSI reported for the recording is the mean of the trajectory:
+\begin{equation}
+\mathrm{CSI} = \bar{r} = \frac{1}{T} \sum_{t=1}^{T} r(t),
+\label{eq:csi}
+\end{equation}
+where $T$ is the trajectory length.
+
+\section{Early Warning Signals}\label{sec:ews}
+
+The CSI is a scalar summary of the trajectory $r(t)$. The trajectory
+itself carries more information than its mean. Four statistical moments
+of $r(t)$ are computed and reported alongside the CSI, as early warning
+signals of impending rhythm transitions.
+
+\subsection{Variance}
+
+The sample variance of the trajectory is
+\begin{equation}
+\mathrm{Var}[r] = \frac{1}{T-1} \sum_{t=1}^{T} (r(t) - \bar{r})^2.
+\label{eq:var}
+\end{equation}
+A rise in the variance of an order parameter is a classic signature of
+critical slowing down: as a system approaches a bifurcation, it
+recovers more slowly from perturbations and therefore exhibits larger
+fluctuations~\cite{scheffer2009}.
+
+\subsection{Skewness}
+
+The sample skewness is
+\begin{equation}
+\mathrm{Skew}[r] = \frac{T}{(T-1)(T-2)} \sum_{t=1}^{T}
+\left( \frac{r(t) - \bar{r}}{\sigma_r} \right)^3,
+\label{eq:skew}
+\end{equation}
+where $\sigma_r = \sqrt{\mathrm{Var}[r]}$. The skewness is a measure of
+asymmetry in the distribution of $r(t)$. It reflects the extent to which
+the trajectory spends time at values above its mean versus below.
+
+\subsection{Excess kurtosis}
+
+The excess kurtosis is
+\begin{equation}
+\mathrm{Kurt}[r] = \frac{1}{T} \sum_{t=1}^{T}
+\left( \frac{r(t) - \bar{r}}{\sigma_r} \right)^4 - 3.
+\label{eq:kurt}
+\end{equation}
+The excess kurtosis measures the weight of the tails of the
+distribution relative to a Gaussian. Positive excess kurtosis indicates
+intermittent bursts of incoherence: the trajectory spends most of its
+time near its mean but occasionally excursions to extreme values.
+
+\subsection{Lag-1 autocorrelation}
+
+The lag-1 autocorrelation is
+\begin{equation}
+\rho_1[r] = \frac{\sum_{t=2}^{T} (r(t) - \bar{r})(r(t-1) - \bar{r})}
+{\sum_{t=1}^{T} (r(t) - \bar{r})^2}.
+\label{eq:lag1}
+\end{equation}
+The lag-1 autocorrelation approaches 1 as the system recovers more
+slowly from perturbations. Together with the variance, it is one of the
+most reliable early warning signals identified in the
+literature~\cite{scheffer2009}.
+
+\section{Mathematical Properties}\label{sec:properties}
+
+\subsection{Invariance to a common frequency offset}
+
+Adding a constant $c$ to every natural frequency in
+equation~\eqref{eq:kuramoto} is equivalent to applying a global rotation
+to all phases. To see this, let $\tilde{\theta}_i(t) = \theta_i(t) - ct$.
+Then
+\begin{equation}
+\frac{d\tilde{\theta}_i}{dt} = \frac{d\theta_i}{dt} - c
+= (\omega_i - c) + \frac{K}{N}\sum_{j=1}^{N}
+\sin(\tilde{\theta}_j - \tilde{\theta}_i),
+\label{eq:offset}
+\end{equation}
+because $\theta_j - \theta_i = \tilde{\theta}_j - \tilde{\theta}_i$.
+The transformed phases satisfy the same Kuramoto equation with shifted
+frequencies. The order parameter, equation~\eqref{eq:orderparam}, is
+invariant to a global rotation, so $r$ is unchanged.
+
+This property is what justifies the frequency normalization of
+equation~\eqref{eq:normalization}. Subtracting the mean of the
+frequencies does not change the relative dynamics. Scaling by the
+standard deviation also does not change the relative dynamics, up to a
+time reparameterization: rescaling all frequencies by $s$ is equivalent
+to rescaling the time axis by $1/s$.
+
+\subsection{The uniform distribution is a fixed point}
+
+Let all phases be equally spaced around the circle:
+\begin{equation}
+\theta_i = \frac{2\pi i}{N}, \quad i = 0, 1, \ldots, N-1.
+\label{eq:uniform}
+\end{equation}
+For any $i$, the sum of sines in equation~\eqref{eq:kuramoto} is
+\begin{equation}
+\sum_{j=0}^{N-1} \sin(\theta_j - \theta_i) = 0,
+\label{eq:zero}
+\end{equation}
+because the pairs $\theta_j$ and $\theta_{j'}$ that are symmetric
+around $\theta_i$ contribute opposite sine values. The right-hand side
+of equation~\eqref{eq:kuramoto} is therefore just $\omega_i$ for every
+$i$.
+
+If all $\omega_i$ are equal, no oscillator moves and the network remains
+in the uniform configuration forever, at any coupling strength. In the
+thermodynamic limit $N \to \infty$, this configuration is unstable
+above $K_c$: any perturbation grows exponentially. But for finite $N$,
+and starting exactly at the uniform distribution, the network is a fixed
+point.
+
+This is a mathematical property, not a bug. Its practical consequence is
+that any test of the coupling mechanism must use an initial condition
+that is not perfectly symmetric. In the CSI pipeline, this property is
+irrelevant, because the phase resets at each R-peak are inherently
+non-symmetric.
+
+\subsection{Dependence on the number of oscillators}
+
+The order parameter is bounded by $r \leq 1$ for any $N$. The expected
+value of $r$ for $N$ oscillators with uniformly random phases is
+\begin{equation}
+\mathbb{E}[r] = \frac{\sqrt{\pi}}{2\sqrt{N}} \cdot
+\frac{\Gamma(N)}{\Gamma(N + 1/2)} \approx \frac{1}{\sqrt{N}}
+\quad \text{for large } N.
+\label{eq:baseline}
+\end{equation}
+For $N = 16$, the incoherent baseline is approximately $0.25$. CSI
+values meaningfully above this baseline indicate partial
+synchronization.
+
+\subsection{Residual information beyond RR variability}
+
+The residual of the CSI is defined as the component orthogonal to the
+coefficient of variation of the RR series. The companion paper reports
+the full analysis; here we note the mathematical result that makes the
+residual non-trivial: the CSI is not a linear function of the RR series
+coefficient of variation, so the OLS residual is not identically zero.
+At $K = 2$, the residual carries information about the atrial state that
+the coefficient of variation does not, though the size of that
+information depends on the frequency distribution (Section~\ref{sec:network})
+and on the coupling strength (Section~\ref{sec:coupling}).
+
+\section{Limitations}\label{sec:limitations}
+
+\subsection{The model is a simplification}
+
+The Kuramoto model describes a population of coupled phase oscillators
+with no amplitude, no spatial structure, and sine coupling. The
+sinoatrial node is none of these things: it has spatial extent, it has
+finite amplitude dynamics, and the coupling between pacemaker cells is
+not necessarily sinusoidal. The Kuramoto model is a minimal description,
+chosen because it captures the essential phenomenon (phase locking) with
+the fewest parameters.
+
+Whether the minimal model is sufficient for the diagnostic purpose is an
+empirical question. If the CSI discriminates clinical states and predicts
+transitions, the minimality is justified. If it does not, a more detailed
+model is needed. Revision 0.2 of the companion residual paper narrows
+the claim: the residual carries information beyond standard HRV, but the
+information is modest and depends on the frequency distribution.
+
+\subsection{The frequency distribution is arbitrary}
+
+The choice to use the Riemann zeros as the frequency distribution is
+inherited from the reference implementation. It is not derived from
+cardiac physiology. The sensitivity analysis shows that the trajectory
+of the CSI is not robust to this choice at any useful coupling strength,
+and that the residual is diagnostic for some distributions but not
+others. The frequency distribution is therefore part of the definition
+of the CSI, not an incidental parameter.
+
+\subsection{The coupling strength is a free parameter}
+
+$K = 2$ is the only value in the tested range where the residual
+separates sinus from AF. The useful range is narrow: below $K = 1$ the
+residual inverts in sign, and above $K = 3$ the network saturates. The
+choice is empirical, not derived. The sensitivity analysis reports the
+full sweep.
+
+\subsection{The single-lead constraint}
+
+The ECG analyzed is single-lead. No spatial information is available.
+The CSI is a temporal metric: it describes the evolution of
+synchronization over time, not its distribution over the atrium. A
+multi-lead device would allow a spatial extension, but that is out of
+scope for this application.
+
+\section{Conclusion}
+
+The Kuramoto model provides a mathematically rigorous framework for
+describing phase synchronization in coupled systems. Applied to the RR
+tachogram of an ECG recording, it yields the Cardiac Synchronization
+Index, a phase-domain measure of how regularly the heart is beating.
+The model's parameters are documented, its numerical integration is
+described, and its limitations are stated. The coupling strength and
+the frequency distribution are the two parameters that determine
+whether the metric is diagnostic; both are reported in the companion
+documents.
+
+The CSI is a research metric. Its clinical validity depends on the
+outcomes of the validation protocols described in the companion white
+paper and the sensitivity analysis. The mathematics in this document
+establishes that the metric is well-defined and computable; it does not
+establish that the metric is clinically useful.
+
+\begin{thebibliography}{9}
+
+\bibitem{kuramoto1975}
+Y.~Kuramoto. Self-entrainment of a population of coupled non-linear
+oscillators. In \emph{International Symposium on Mathematical Problems
+in Theoretical Physics}, pages 420--422. Springer, 1975.
+
+\bibitem{acebron2005}
+J.~A.~Acebr\'on, L.~L.~Bonilla, C.~J.~P\'erez Vicente, F.~Ritort, and
+R.~Spigler. The Kuramoto model: A simple paradigm for synchronization
+phenomena. \emph{Reviews of Modern Physics}, 77(1):137--185, 2005.
+
+\bibitem{strogatz2000}
+S.~H.~Strogatz. From Kuramoto to Crawford: exploring the onset of
+synchronization in populations of coupled oscillators.
+\emph{Physica D}, 143(1--4):1--20, 2000.
+
+\bibitem{scheffer2009}
+M.~Scheffer, J.~Bascompte, W.~A.~Brock, V.~Brovkin, S.~R.~Carpenter,
+V.~Dakos, H.~Held, E.~H.~van Nes, M.~Rietkerk, and G.~Sugihara.
+Early-warning signals for critical transitions. \emph{Nature},
+461(7260):53--59, 2009.
+
+\bibitem{simoes2026whitepaper}
+A.~Simoes. NeuroCardia: An Open-Source, On-Device Phase-Domain
+Diagnostic Engine for Single-Lead ECG. White paper, revision 0.2, 2026.
+Companion document.
+
+\bibitem{simoes2026sensitivity}
+A.~Simoes. Sensitivity Analysis Protocol: Validation Methodology for
+the Kuramoto Phase Engine in NeuroCardia. Protocol, revision 0.2, 2026.
+Companion document.
+
+\bibitem{simoes2026residual}
+A.~Simoes. The Kuramoto Residual: Phase-Domain Information in the
+Cardiac Rhythm Beyond Heart Rate Variability. Research paper, revision
+0.2, 2026. Companion document.
+
+\end{thebibliography}
+
+\end{document}

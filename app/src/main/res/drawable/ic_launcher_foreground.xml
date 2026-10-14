@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Placeholder foreground. Replace with the heart + waveform SVG paths
+  once the real design is ready. Content must fit inside the center
+  72dp of the 108dp canvas (i.e. between x=18 and x=90).
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#4DD9E8"
+        android:pathData="M54,38 C48,28 34,28 34,42 C34,56 54,72 54,72 C54,72 74,56 74,42 C74,28 60,28 54,38 Z"/>
+</vector>

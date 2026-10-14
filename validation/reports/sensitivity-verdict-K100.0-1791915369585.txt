@@ -1,0 +1,28 @@
+# NeuroCardia sensitivity analysis verdict
+# Generated: 2026-10-13T18:19:03.514559676Z
+# Threshold: Pearson correlation with Arm A >= 0.80
+
+Arm B (Uniform random)
+  mean Pearson correlation with Arm A: -0.0003
+  mean normalized DTW:                 0.1386
+  records passing threshold:           0 / 48
+  verdict:                             FAIL
+
+Arm C (Gaussian)
+  mean Pearson correlation with Arm A: 0.0001
+  mean normalized DTW:                 0.1387
+  records passing threshold:           0 / 48
+  verdict:                             FAIL
+
+Arm D (Physiological scale)
+  mean Pearson correlation with Arm A: 0.0010
+  mean normalized DTW:                 0.1386
+  records passing threshold:           0 / 48
+  verdict:                             FAIL
+
+Arm E (Linear spacing)
+  mean Pearson correlation with Arm A: 0.0010
+  mean normalized DTW:                 0.1387
+  records passing threshold:           0 / 48
+  verdict:                             FAIL
+
